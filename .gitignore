@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+bin/
+include/
+lib/
+lib64/
+local/
+
+# Editor/OS specific
+.idea/
+.vscode/
+*.swp
+*~
+*.log
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.*
+*.env
+
+# Database files (if applicable)
+*.sqlite3
+*.db
+*.db-journal
+
+# FastAPI specific
+# Uvicorn/Gunicorn related log files or temporary files
+# Example: if you have a specific log directory
+# logs/
+
+# Build artifacts (if any)
+dist/
+build/
+
+# Other temporary files
+tmp/
