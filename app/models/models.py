@@ -43,6 +43,11 @@ class DatasetPublic(DatasetBase):
     updated_at: datetime
 
 
+class DatasetsPublic(SQLModel):
+    results: list[DatasetPublic]
+    count: int
+
+
 class Dataset(DatasetBase, table=True):
     id: int = Field(default=None, primary_key=True, index=True)
     storage_path: Optional[str] = None
