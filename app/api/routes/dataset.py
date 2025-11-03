@@ -8,7 +8,7 @@ from fastapi import APIRouter, File, UploadFile, status
 from app.api.deps import SessionDep
 from app.constants import DatasetStatus
 from app.core.minio import BUCKET_NAME
-from app.schemas import ApiResponse, Dataset, DatasetCreate, DatasetPublic
+from app.models.models import ApiResponse, Dataset, DatasetCreate, DatasetPublic
 from app.services.storage import ensure_bucket, upload_bytes
 
 
