@@ -7,3 +7,7 @@ class DatasetStatus(str, enum.Enum):
     PROFILING = "PROFILING"
     FAILED = "FAILED"
     DELETED = "DELETED"
+
+class ModelStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    DELETED = "DELETED"

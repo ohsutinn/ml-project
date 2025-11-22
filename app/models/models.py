@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from typing import Generic, Optional, TypeVar
 from pydantic.generics import GenericModel
-from sqlmodel import Column, Enum, Field, SQLModel
-from app.constants import DatasetStatus
+from sqlmodel import Column, Enum, Field, SQLModel, table
+from app.constants import DatasetStatus, ModelStatus
 import sqlalchemy as sa
 
 
@@ -51,6 +51,56 @@ class DatasetsPublic(SQLModel):
 class Dataset(DatasetBase, table=True):
     id: int = Field(default=None, primary_key=True, index=True)
     storage_path: Optional[str] = None
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+    )
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+        ),
+    )
+    deleted_at: Optional[datetime] = None
+
+
+class ModelBase(SQLModel):
+    name: str = Field(max_length=255)
+    task: str = Field(max_length=64)
+    status: ModelStatus = Field(
+        default=ModelStatus.ACTIVE,
+        sa_column=Column(
+            Enum(ModelStatus, name="status"),
+            nullable=False,
+            server_default=ModelStatus.ACTIVE,
+        ),
+    )
+
+
+class ModelCreate(ModelBase):
+    pass
+
+
+class ModelPublic(ModelBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class ModelsPubic(ModelPublic):
+    results: list[ModelPublic]
+    count: int
+
+
+class Model(ModelBase, table=True):
+    id: int = Field(default=None, primary_key=True, index=True)
     created_at: datetime = Field(
         default=None,
         sa_column=Column(
