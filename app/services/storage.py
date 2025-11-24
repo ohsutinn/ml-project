@@ -49,10 +49,10 @@ def build_dataset_object_name(
     Dataset / DatasetVersion 용 object_name 규칙.
 
     예시:
-      datasets/42/v3/2025/11/19/abcdefgh_original.csv
+      datasets/42/v3/20251119/abcdefgh_original.csv
     """
 
-    date = datetime.now(timezone.utc).strftime("%Y/%m/%d")
+    date = datetime.now(timezone.utc).strftime("%Y%m%d")
     safe_name = Path(file_name).name  # 경로 제거, 파일명만
     u8 = uuid.uuid4().hex[:8]
 
