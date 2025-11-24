@@ -209,7 +209,7 @@ class ModelPublic(ModelBase):
     updated_at: datetime
 
 
-class ModelsPubic(ModelPublic):
+class ModelsPubic(SQLModel):
     results: list[ModelPublic]
     count: int
 
