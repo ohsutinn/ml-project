@@ -14,6 +14,9 @@ class Settings(BaseSettings):
 
     API_V1_STR: str = "/api/v1"
 
+    # 파이프라인으로 이식 예정
+    DV_SERVER_URL: str
+
     POSTGRES_SERVER: str
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str
