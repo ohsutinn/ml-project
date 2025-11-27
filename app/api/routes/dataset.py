@@ -113,7 +113,7 @@ async def read_dataset(
         .select_from(DatasetVersion)
         .where(
             DatasetVersion.dataset_id == dataset_id
-            or DatasetVersion.deleted_at.is_(None)
+            and DatasetVersion.deleted_at.is_(None)
         )
     )
     result = await session.exec(count_statement)
@@ -123,7 +123,7 @@ async def read_dataset(
         select(DatasetVersion)
         .where(
             DatasetVersion.dataset_id == dataset_id
-            or DatasetVersion.deleted_at.is_(None)
+            and DatasetVersion.deleted_at.is_(None)
         )
         .order_by(DatasetVersion.version.asc())
         .offset(skip)
@@ -192,7 +192,7 @@ async def create_dataset_version(
         select(DatasetVersion)
         .where(
             DatasetVersion.dataset_id == dataset_id
-            or DatasetVersion.deleted_at.is_(None)
+            and DatasetVersion.deleted_at.is_(None)
         )
         .order_by(DatasetVersion.version.desc())
     )
@@ -268,7 +268,7 @@ async def read_dataset_versions(
         .select_from(DatasetVersion)
         .where(
             DatasetVersion.dataset_id == dataset_id
-            or DatasetVersion.deleted_at.is_(None)
+            and DatasetVersion.deleted_at.is_(None)
         )
     )
     result = await session.exec(count_statement)
@@ -278,7 +278,7 @@ async def read_dataset_versions(
         select(DatasetVersion)
         .where(
             DatasetVersion.dataset_id == dataset_id
-            or DatasetVersion.deleted_at.is_(None)
+            and DatasetVersion.deleted_at.is_(None)
         )
         .order_by(DatasetVersion.version.asc())
     )
@@ -317,7 +317,7 @@ async def create_baseline(
         select(DatasetVersion)
         .where(
             DatasetVersion.dataset_id == dataset_id
-            or DatasetVersion.deleted_at.is_(None)
+            and DatasetVersion.deleted_at.is_(None)
         )
         .order_by(DatasetVersion.version.desc())
         .limit(1)
