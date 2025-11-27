@@ -252,6 +252,7 @@ class DatasetVersion(DatasetVersionBase, table=True):
             onupdate=sa.func.now(),
         ),
     )
+    deleted_at: Optional[datetime] = None
 
     dataset: Dataset = Relationship(back_populates="versions")
 
