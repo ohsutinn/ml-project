@@ -5,11 +5,16 @@ from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from sqlmodel import func, select
 
 from app.api.deps import SessionDep
-from app.constants import DatasetStatus
+from app.clients.dv_client import validate_dataset_on_dv_server
+from app.constants import DVMode, DVSplit, DatasetStatus
 from app.core.minio import BUCKET_NAME
 from app.models.models import (
     ApiResponse,
     Dataset,
+    DatasetBaseLineRequest,
+    DatasetBaseline,
+    DatasetBaselineCreate,
+    DatasetBaselinePublic,
     DatasetCreate,
     DatasetDetailPublic,
     DatasetPublic,
@@ -106,14 +111,20 @@ async def read_dataset(
     count_statement = (
         select(func.count())
         .select_from(DatasetVersion)
-        .where(DatasetVersion.dataset_id == dataset_id)
+        .where(
+            DatasetVersion.dataset_id == dataset_id
+            or DatasetVersion.deleted_at.is_(None)
+        )
     )
     result = await session.exec(count_statement)
     count = result.one()
 
     statement = (
         select(DatasetVersion)
-        .where(DatasetVersion.dataset_id == dataset_id)
+        .where(
+            DatasetVersion.dataset_id == dataset_id
+            or DatasetVersion.deleted_at.is_(None)
+        )
         .order_by(DatasetVersion.version.asc())
         .offset(skip)
         .limit(limit)
@@ -179,12 +190,17 @@ async def create_dataset_version(
     # 현재 dataset 의 마지막 버전 번호 조회
     statement = (
         select(DatasetVersion)
-        .where(DatasetVersion.dataset_id == dataset_id)
+        .where(
+            DatasetVersion.dataset_id == dataset_id
+            or DatasetVersion.deleted_at.is_(None)
+        )
         .order_by(DatasetVersion.version.desc())
     )
     result = await session.exec(statement)
     last_version = result.first()
-    next_version = 1 if last_version is None else last_version.version + 1 # 동시성 문제 고려해야 함
+    next_version = (
+        1 if last_version is None else last_version.version + 1
+    )  # 동시성 문제 고려해야 함
 
     # object_name 구성 (dataset_id + version 기반)
     object_name = build_dataset_object_name(
@@ -250,14 +266,20 @@ async def read_dataset_versions(
     count_statement = (
         select(func.count())
         .select_from(DatasetVersion)
-        .where(DatasetVersion.dataset_id == dataset_id)
+        .where(
+            DatasetVersion.dataset_id == dataset_id
+            or DatasetVersion.deleted_at.is_(None)
+        )
     )
     result = await session.exec(count_statement)
     count = result.one()
 
     statement = (
         select(DatasetVersion)
-        .where(DatasetVersion.dataset_id == dataset_id)
+        .where(
+            DatasetVersion.dataset_id == dataset_id
+            or DatasetVersion.deleted_at.is_(None)
+        )
         .order_by(DatasetVersion.version.asc())
     )
     result = await session.exec(statement)
@@ -272,4 +294,78 @@ async def read_dataset_versions(
         code=HTTPStatus.OK,
         message="데이터셋 버전 목록 조회 성공",
         data=data,
+    )
+
+
+# ------------------------------------------------------------------------------
+# 3) Dataset Baseline 생성
+# ------------------------------------------------------------------------------
+
+
+@router.post(
+    "/{dataset_id}/baseline",
+    response_model=ApiResponse[DatasetBaselinePublic],
+)
+async def create_baseline(
+    dataset_id: int,
+    body: DatasetBaseLineRequest,
+    session: SessionDep,
+) -> Any:
+
+    # 1) 최신 DatasetVersion 조회
+    statement = (
+        select(DatasetVersion)
+        .where(
+            DatasetVersion.dataset_id == dataset_id
+            or DatasetVersion.deleted_at.is_(None)
+        )
+        .order_by(DatasetVersion.version.desc())
+        .limit(1)
+    )
+
+    dataset_version = (await session.exec(statement)).first()
+    if not dataset_version:
+        raise HTTPException(404, "최신 데이터셋을 찾을 수 없습니다.")
+
+    # 2) Data Validation 서버에 보낼 payload 구성
+    dv_result = await validate_dataset_on_dv_server(
+        data_path=dataset_version.storage_path,
+        split=DVSplit.TRAIN,
+        schema_path=None,
+        baseline_stats_path=None,
+        label_column=body.label_column,
+        mode=DVMode.INITIAL_BASELINE,
+    )
+
+    # 3) 응답에서 schema/statistics 저장 위치를 DB에 기록
+    baseline_in = DatasetBaselineCreate(
+        version=dataset_version.version,
+        schema_path=dv_result["schema_path"],
+        baseline_stats_path=dv_result["baseline_stats_path"],
+    )
+
+    baseline = DatasetBaseline.model_validate(
+        baseline_in,
+        update={
+            "dataset_id": dataset_id,
+        },
+    )
+    session.add(baseline)
+
+    # Dataset Version READY 상태 변경
+    dataset_version.status = DatasetStatus.READY
+
+    # Dataset 테이블에도 baseline 정보 세팅
+    dataset = await session.get(Dataset, dataset_id)
+    dataset.baseline_version_id = dataset_version.version
+    dataset.schema_path = baseline.schema_path
+    dataset.baseline_stats_path = baseline.baseline_stats_path
+
+    await session.commit()
+    await session.refresh(baseline)
+
+    return ApiResponse(
+        code=200,
+        message="초기 베이스라인 생성 완료",
+        data=baseline,
     )

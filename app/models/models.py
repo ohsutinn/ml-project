@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Generic, List, Optional, TypeVar
+from pydantic import BaseModel
 from pydantic.generics import GenericModel
 from sqlmodel import Column, Enum, Field, Relationship, SQLModel
 from app.constants import DatasetStatus, ModelStatus
@@ -26,6 +27,7 @@ class ApiResponse(GenericModel, Generic[T]):
 # ------------------------------------------------------------------------------
 
 # ---- Dataset (논리 데이터셋) ---------------------------------------------------
+
 
 class DatasetBase(SQLModel):
     """
@@ -75,6 +77,10 @@ class Dataset(SQLModel, table=True):
     name: str = Field(max_length=255, index=True)
     description: Optional[str] = Field(default=None, max_length=1000)
 
+    baseline_version_id: Optional[int] = Field(default=None)
+    schema_path: Optional[str] = Field(default=None)
+    baseline_stats_path: Optional[str] = Field(default=None)
+
     created_at: datetime = Field(
         default=None,
         sa_column=sa.Column(
@@ -94,8 +100,73 @@ class Dataset(SQLModel, table=True):
     )
     deleted_at: Optional[datetime] = None  # 소프트 삭제용
 
-    # 관계: 하나의 Dataset 에 여러 DatasetVersion
-    versions: List["DatasetVersion"] = Relationship(back_populates="dataset")
+    versions: list["DatasetVersion"] = Relationship(back_populates="dataset")
+
+
+# DatasetBaseline (스키마 + 베이스라인 통계)
+
+
+class DatasetBaselineBase(SQLModel):
+    """
+    특정 Dataset 에 대해 사용 중인 스키마/베이스라인 통계 정보.
+    (dataset_id 는 table / Public 에서만 포함)
+    """
+
+    version: int = Field(index=True)
+
+    # MinIO 등 오브젝트 스토리지 상의 경로
+    schema_path: str = Field(max_length=1024)
+    baseline_stats_path: str = Field(max_length=1024)
+
+
+class DatasetBaselineCreate(DatasetBaselineBase):
+    """
+    서버 내부에서 DatasetBaseline 레코드 생성 시 사용하는 DTO.
+    """
+
+    pass
+
+
+class DatasetBaselinePublic(DatasetBaselineBase):
+    """
+    베이스라인 조회용 DTO.
+    """
+
+    id: int
+    dataset_id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class DatasetBaseLineRequest(BaseModel):
+    label_column: str | None = None
+
+
+class DatasetBaseline(DatasetBaselineBase, table=True):
+    """
+    베이스라인 테이블 정의.
+    """
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    dataset_id: int = Field(foreign_key="dataset.id", index=True)
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=sa.Column(
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+    )
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=sa.Column(
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+        ),
+    )
 
 
 # ---- DatasetVersion (실제 버전/스냅샷) ---------------------------------------
@@ -103,10 +174,9 @@ class Dataset(SQLModel, table=True):
 
 class DatasetVersionBase(SQLModel):
     """
-    실제 저장된 데이터 스냅샷(파일)에 대한 메타데이터.
+    실제 저장된 데이터에 대한 메타데이터.
     """
 
-    # 버전 번호 (1, 2, 3 ...)
     version: int = Field(index=True)
 
     # 파일 정보
@@ -114,7 +184,7 @@ class DatasetVersionBase(SQLModel):
     size_bytes: int
     file_type: str = Field(max_length=255)
 
-    # 오브젝트 스토리지 경로 (예: "my-bucket/datasets/1/v1/...")
+    # 오브젝트 스토리지 경로
     storage_path: str = Field(max_length=1024)
 
     # 상태 (PENDING/READY/FAILED 등)
@@ -159,7 +229,7 @@ class DatasetVersionsPublic(SQLModel):
 
 class DatasetVersion(DatasetVersionBase, table=True):
     """
-    실제 스냅샷(파일) 버전 테이블.
+    실제 데이터 버전 테이블.
     """
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -234,3 +304,17 @@ class Model(ModelBase, table=True):
         ),
     )
     deleted_at: Optional[datetime] = None
+
+
+class TrainModelRequest(BaseModel):
+    """
+    모델 학습 요청 바디.
+
+    - dataset_version_id: 어떤 데이터셋 버전으로 학습할지
+    - split: 검증 시 사용할 split 정보 (기본 "train")
+    - label_column: TFDV에서 라벨 분포 확인용 컬럼명
+    """
+
+    dataset_version_id: int
+    split: str
+    label_column: Optional[str] = None 
