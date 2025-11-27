@@ -303,29 +303,19 @@ async def read_dataset_versions(
 
 
 @router.post(
-    "/{dataset_id}/baseline",
+    "/versions/{dataset_version_id}/baseline",
     response_model=ApiResponse[DatasetBaselinePublic],
 )
 async def create_baseline(
-    dataset_id: int,
+    dataset_version_id: int,
     body: DatasetBaseLineRequest,
     session: SessionDep,
 ) -> Any:
 
-    # 1) 최신 DatasetVersion 조회
-    statement = (
-        select(DatasetVersion)
-        .where(
-            DatasetVersion.dataset_id == dataset_id
-            and DatasetVersion.deleted_at.is_(None)
-        )
-        .order_by(DatasetVersion.version.desc())
-        .limit(1)
-    )
-
-    dataset_version = (await session.exec(statement)).first()
-    if not dataset_version:
-        raise HTTPException(404, "최신 데이터셋을 찾을 수 없습니다.")
+    # 1) DatasetVersion 조회
+    dataset_version = await session.get(DatasetVersion, dataset_version_id)
+    if not dataset_version or dataset_version.deleted_at is not None:
+        raise HTTPException(404, "데이터셋을 찾을 수 없습니다.")
 
     # 2) Data Validation 서버에 보낼 payload 구성
     dv_result = await validate_dataset_on_dv_server(
@@ -347,16 +337,16 @@ async def create_baseline(
     baseline = DatasetBaseline.model_validate(
         baseline_in,
         update={
-            "dataset_id": dataset_id,
+            "dataset_id": dataset_version.dataset_id,
         },
     )
     session.add(baseline)
 
-    # Dataset Version READY 상태 변경
+    # DatasetVersion 상태 업데이트
     dataset_version.status = DatasetStatus.READY
 
     # Dataset 테이블에도 baseline 정보 세팅
-    dataset = await session.get(Dataset, dataset_id)
+    dataset = await session.get(Dataset, dataset_version.dataset_id)
     dataset.baseline_version_id = dataset_version.version
     dataset.schema_path = baseline.schema_path
     dataset.baseline_stats_path = baseline.baseline_stats_path
