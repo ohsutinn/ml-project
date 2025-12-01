@@ -8,7 +8,7 @@ from app.core.config import settings
 import tensorflow_data_validation as tfdv
 from tensorflow_metadata.proto.v0 import anomalies_pb2, schema_pb2, statistics_pb2
 from urllib.parse import urlparse
-from app.constants import AnomalySeverity, DataSplit
+from app.constants import AnomalySeverity, DVSplit
 from app.core.minio import minio_client
 from app.models.models import ValidationAnomaly, ValidationSummary
 
@@ -50,7 +50,7 @@ def generate_stats_from_csv(path: str) -> statistics_pb2.DatasetFeatureStatistic
 
 def save_stats(
     stats: statistics_pb2.DatasetFeatureStatisticsList,
-    split: DataSplit,
+    split: DVSplit,
 ) -> str:
     """
     현재 통계를 디스크에 저장 (디버깅/TFDV HTML용 등).
@@ -63,7 +63,7 @@ def save_stats(
 
 def save_anomalies(
     anomalies: anomalies_pb2.Anomalies,
-    split: DataSplit,
+    split: DVSplit,
 ) -> str:
     """
     anomalies proto를 디스크에 저장 (디버깅/HTML 렌더링 용도).
@@ -234,7 +234,7 @@ def resolve_data_path(path: str) -> str:
     return tmp_path
 
 
-def save_schema(schema: schema_pb2.Schema, split: DataSplit) -> str:
+def save_schema(schema: schema_pb2.Schema, split: DVSplit) -> str:
     schema_path = SCHEMA_DIR / f"schema_{split.value}.pbtxt"
     tfdv.write_schema_text(schema, str(schema_path))
     return str(schema_path)
