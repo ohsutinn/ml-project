@@ -7,4 +7,4 @@ minio_client = Minio(
     secret_key=settings.MINIO_SECRET_KEY,
     secure=False,                     
 )
-BUCKET_NAME = "demo-bucket"
+BUCKET_NAME = "tfdv-artifacts"
