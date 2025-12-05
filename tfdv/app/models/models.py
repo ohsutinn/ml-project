@@ -46,6 +46,16 @@ class DataValidationRequest(BaseModel):
 
     mode: DVMode = DVMode.VALIDATE
 
+    dataset_id: int = Field(
+        ...,
+        description="논리 Dataset ID",
+    )
+
+    dataset_version: int = Field(
+        ...,
+        description="DatasetVersion ID.",
+    )
+
 
 class ValidationAnomaly(BaseModel):
     """
@@ -100,6 +110,16 @@ class DataValidationResult(BaseModel):
     - metrics:
         샘플 수, 라벨 분포, 라벨 스큐 등 정량 지표 (플랫폼 정책에서 사용)
     """
+
+    dataset_id: Optional[int] = Field(
+        default=None,
+        description="해당 검증이 속한 Dataset ID",
+    )
+
+    dataset_version: Optional[int] = Field(
+        default=None,
+        description="해당 검증이 속한 DatasetVersion",
+    )
 
     split: DVSplit
     data_path: str
