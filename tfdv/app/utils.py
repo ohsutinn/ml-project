@@ -1,76 +1,129 @@
-import os
-from pathlib import Path
-import tempfile
+# app/utils.py
 from typing import Any, Dict, List, Tuple
 
-from fastapi import HTTPException, status
-from app.core.config import settings
 import tensorflow_data_validation as tfdv
 from tensorflow_metadata.proto.v0 import anomalies_pb2, schema_pb2, statistics_pb2
-from urllib.parse import urlparse
+
 from app.constants import AnomalySeverity, DVSplit
-from app.core.minio import minio_client
+from app.core.storage import (
+    build_tfdv_object_name,
+    download_bytes,
+    upload_bytes,
+)
 from app.models.models import ValidationAnomaly, ValidationSummary
 
 
-BASE_DIR = settings.DV_BASE_DIR.resolve()
-OUTPUT_DIR = settings.DV_OUTPUT_DIR
-SCHEMA_DIR = settings.DV_SCHEMA_DIR
-STATS_DIR = settings.DV_STATS_DIR
-ANOMALIES_DIR = settings.DV_ANOMALIES_DIR
+async def save_stats(
+    stats: statistics_pb2.DatasetFeatureStatisticsList,
+    split: DVSplit,
+    dataset_id: int,
+    dataset_version: int,
+) -> str:
+    """
+    통계 proto → bytes 직렬화 → MinIO 업로드.
+    반환: 'bucket/object' URI.
+    """
+    data = stats.SerializeToString()
+    object_name = build_tfdv_object_name(
+        dataset_id=dataset_id,
+        version=dataset_version,
+        split=split.value,
+        kind="stats",
+        ext="binpb",
+    )
+    uri = await upload_bytes(
+        data=data,
+        object_name=object_name,
+        content_type="application/x-protobuf",
+    )
+    return uri
 
 
-def ensure_output_dirs() -> None:
-    """데이터 검증 결과를 저장할 디렉토리들을 모두 만들어 둔다."""
-    for d in (OUTPUT_DIR, SCHEMA_DIR, STATS_DIR, ANOMALIES_DIR):
-        d.mkdir(parents=True, exist_ok=True)
+async def save_schema(
+    schema: schema_pb2.Schema,
+    split: DVSplit,
+    dataset_id: int,
+    dataset_version: int,
+) -> str:
+    """
+    스키마 proto → bytes 직렬화 → MinIO 업로드.
+    반환: 'bucket/object' URI.
+    """
+    data = schema.SerializeToString()
+    object_name = build_tfdv_object_name(
+        dataset_id=dataset_id,
+        version=dataset_version,
+        split=split.value,
+        kind="schema",
+        ext="binpb",
+    )
+    uri = await upload_bytes(
+        data=data,
+        object_name=object_name,
+        content_type="application/x-protobuf",
+    )
+    return uri
 
 
-def load_schema_if_exists(schema_path: str | None) -> schema_pb2.Schema | None:
-    if not schema_path:
+async def save_anomalies(
+    anomalies: anomalies_pb2.Anomalies,
+    split: DVSplit,
+    dataset_id: int,
+    dataset_version: int,
+) -> str:
+    """
+    아노말리 proto → bytes 직렬화 → MinIO 업로드.
+    """
+    data = anomalies.SerializeToString()
+    object_name = build_tfdv_object_name(
+        dataset_id=dataset_id,
+        version=dataset_version,
+        split=split.value,
+        kind="anomalies",
+        ext="binpb",
+    )
+    uri = await upload_bytes(
+        data=data,
+        object_name=object_name,
+        content_type="application/x-protobuf",
+    )
+    return uri
+
+
+async def load_schema_if_exists(schema_uri: str | None) -> schema_pb2.Schema | None:
+    """
+    MinIO URI('bucket/object')에서 스키마 로드.
+    """
+    if not schema_uri:
         return None
-    if not os.path.exists(schema_path):
-        return None
-    return tfdv.load_schema_text(schema_path)
+
+    data = await download_bytes(schema_uri)
+    schema = schema_pb2.Schema()
+    schema.ParseFromString(data)
+    return schema
 
 
-def load_stats_if_exists(
-    stats_path: str | None,
+async def load_stats_if_exists(
+    stats_uri: str | None,
 ) -> statistics_pb2.DatasetFeatureStatisticsList | None:
-    if not stats_path:
+    """
+    MinIO URI('bucket/object')에서 통계 로드.
+    """
+    if not stats_uri:
         return None
-    if not os.path.exists(stats_path):
-        return None
-    return tfdv.load_statistics(stats_path)
+
+    data = await download_bytes(stats_uri)
+    stats = statistics_pb2.DatasetFeatureStatisticsList()
+    stats.ParseFromString(data)
+    return stats
 
 
 def generate_stats_from_csv(path: str) -> statistics_pb2.DatasetFeatureStatisticsList:
+    """
+    로컬 CSV 파일 경로에서 통계 생성.
+    (CSV 자체는 storage.resolve_data_path에서 MinIO → temp 파일로 내려받은 상태라고 가정)
+    """
     return tfdv.generate_statistics_from_csv(data_location=path)
-
-
-def save_stats(
-    stats: statistics_pb2.DatasetFeatureStatisticsList,
-    split: DVSplit,
-) -> str:
-    """
-    현재 통계를 디스크에 저장 (디버깅/TFDV HTML용 등).
-    ArgMax Mini에서는 dataset_version_id 기반으로 관리해도 무방.
-    """
-    stats_path = STATS_DIR / f"stats_{split.value}.binarypb"
-    tfdv.write_stats_text(stats, str(stats_path))
-    return str(stats_path)
-
-
-def save_anomalies(
-    anomalies: anomalies_pb2.Anomalies,
-    split: DVSplit,
-) -> str:
-    """
-    anomalies proto를 디스크에 저장 (디버깅/HTML 렌더링 용도).
-    """
-    anomalies_path = ANOMALIES_DIR / f"anomalies_{split.value}.pbtxt"
-    tfdv.write_anomalies_text(anomalies, str(anomalies_path))
-    return str(anomalies_path)
 
 
 def categorize_anomaly(info: anomalies_pb2.AnomalyInfo) -> str:
@@ -205,43 +258,10 @@ def compute_label_skew(
     return sum(abs(current.get(k, 0.0) - baseline.get(k, 0.0)) for k in keys)
 
 
-def resolve_data_path(path: str) -> str:
-    parts = path.split("/", 1)
-    if len(parts) != 2:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"지원하지 않는 data_path 형식입니다: {path}",
-        )
-
-    bucket, object_name = parts
-
-    suffix = os.path.splitext(object_name)[1]
-    fd, tmp_path = tempfile.mkstemp(suffix=suffix)
-    os.close(fd)
-
-    try:
-        minio_client.fget_object(
-            bucket_name=bucket,
-            object_name=object_name,
-            file_path=tmp_path,
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"MinIO에서 파일을 다운로드하는 중 오류가 발생했습니다: {e}",
-        )
-
-    return tmp_path
-
-
-def save_schema(schema: schema_pb2.Schema, split: DVSplit) -> str:
-    schema_path = SCHEMA_DIR / f"schema_{split.value}.pbtxt"
-    tfdv.write_schema_text(schema, str(schema_path))
-    return str(schema_path)
-
-
 def build_metrics(
-    stats, label_column: str | None, baseline_stats=None
+    stats: statistics_pb2.DatasetFeatureStatisticsList,
+    label_column: str | None,
+    baseline_stats: statistics_pb2.DatasetFeatureStatisticsList | None = None,
 ) -> dict[str, Any]:
     num_examples = stats.datasets[0].num_examples if stats.datasets else 0
     num_features = len(stats.datasets[0].features) if stats.datasets else 0
