@@ -325,6 +325,8 @@ async def create_baseline(
         baseline_stats_path=None,
         label_column=body.label_column,
         mode=DVMode.INITIAL_BASELINE,
+        dataset_id=dataset_version.dataset_id,
+        dataset_version=dataset_version.version,
     )
 
     # 3) 응답에서 schema/statistics 저장 위치를 DB에 기록

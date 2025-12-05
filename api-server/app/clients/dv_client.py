@@ -16,11 +16,13 @@ class DVClientError(Exception):
 async def validate_dataset_on_dv_server(
     *,
     data_path: str,
-    split: str = "train",          
+    split: str = "train",
     schema_path: Optional[str] = None,
     baseline_stats_path: Optional[str] = None,
     label_column: Optional[str] = None,
-    mode: Optional[str] = None,     
+    mode: Optional[str] = None,
+    dataset_id: Optional[int] = None,
+    dataset_version: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     DV 서버(/api/v1/validation/run)에 데이터 검증을 요청하고,
@@ -36,9 +38,10 @@ async def validate_dataset_on_dv_server(
         "schema_path": schema_path,
         "baseline_stats_path": baseline_stats_path,
         "label_column": label_column,
+        "mode": mode,
+        "dataset_id": dataset_id,
+        "dataset_version": dataset_version,
     }
-    if mode is not None:
-        payload["mode"] = mode
 
     async with httpx.AsyncClient(timeout=None) as client:
         try:
