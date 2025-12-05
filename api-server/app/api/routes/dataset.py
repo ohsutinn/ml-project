@@ -8,13 +8,13 @@ from app.api.deps import SessionDep
 from app.clients.dv_client import validate_dataset_on_dv_server
 from app.constants import DVMode, DVSplit, DatasetStatus
 from app.core.minio import BUCKET_NAME
-from app.models.models import (
-    ApiResponse,
+from app.models.common import ApiResponse
+from app.models.dataset import (
+    BaselineWithValidationResult,
     Dataset,
     DatasetBaseLineRequest,
     DatasetBaseline,
     DatasetBaselineCreate,
-    DatasetBaselinePublic,
     DatasetCreate,
     DatasetDetailPublic,
     DatasetPublic,
@@ -304,7 +304,7 @@ async def read_dataset_versions(
 
 @router.post(
     "/versions/{dataset_version_id}/baseline",
-    response_model=ApiResponse[DatasetBaselinePublic],
+    response_model=ApiResponse[BaselineWithValidationResult],
 )
 async def create_baseline(
     dataset_version_id: int,
@@ -359,5 +359,5 @@ async def create_baseline(
     return ApiResponse(
         code=200,
         message="초기 베이스라인 생성 완료",
-        data=baseline,
+        data=BaselineWithValidationResult(baseline=baseline, validation=dv_result),
     )

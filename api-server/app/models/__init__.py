@@ -1,1 +1,2 @@
-from .models import Dataset, DatasetVersion
+from .dataset import Dataset, DatasetVersion, DatasetBaseline
+from .model import Model

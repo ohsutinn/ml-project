@@ -5,7 +5,9 @@ from fastapi import APIRouter, HTTPException, status
 from app.api.deps import SessionDep
 from app.clients.dv_client import validate_dataset_on_dv_server
 from app.constants import ModelStatus
-from app.models.models import ApiResponse, DatasetVersion, Model, ModelCreate, ModelPublic, TrainModelRequest
+from app.models.common import ApiResponse
+from app.models.dataset import DatasetVersion
+from app.models.model import Model, ModelCreate, ModelPublic, TrainModelRequest
 
 
 router = APIRouter(prefix="/models", tags=["models"])
@@ -39,7 +41,9 @@ async def create_model(session: SessionDep, model_in: ModelCreate) -> Any:
     response_model=ApiResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def train_model(session: SessionDep, model_id: int, train_in: TrainModelRequest) -> Any:
+async def train_model(
+    session: SessionDep, model_id: int, train_in: TrainModelRequest
+) -> Any:
     """
     모델 학습 요청
 
@@ -62,8 +66,9 @@ async def train_model(session: SessionDep, model_id: int, train_in: TrainModelRe
     # 2) DatasetVersion 조회
     dataset_version = await session.get(DatasetVersion, train_in.dataset_version_id)
     if not dataset_version:
-        raise HTTPException(status_code=404, detail="존재하지 않는 데이터셋 버전입니다.")
-
+        raise HTTPException(
+            status_code=404, detail="존재하지 않는 데이터셋 버전입니다."
+        )
 
     # 3) DV 서버로 보낼 data_path 준비
     #
@@ -85,7 +90,7 @@ async def train_model(session: SessionDep, model_id: int, train_in: TrainModelRe
     dv_result = await validate_dataset_on_dv_server(
         data_path=data_path,
         split=train_in.split,
-        schema_path=None,            # 스키마/베이스라인은 나중에 붙여도 됨
+        schema_path=None,  # 스키마/베이스라인은 나중에 붙여도 됨
         baseline_stats_path=None,
         label_column=train_in.label_column,
     )

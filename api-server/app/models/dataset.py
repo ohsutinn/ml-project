@@ -1,32 +1,16 @@
-from datetime import datetime, timezone
-from typing import Generic, List, Optional, TypeVar
-from pydantic import BaseModel
-from pydantic.generics import GenericModel
-from sqlmodel import Column, Enum, Field, Relationship, SQLModel
-from app.constants import DatasetStatus, ModelStatus
+from datetime import datetime
+from typing import List, Optional
+
 import sqlalchemy as sa
+from sqlmodel import Field, Relationship, SQLModel
 
-
-def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-T = TypeVar("T")
-
-
-class ApiResponse(GenericModel, Generic[T]):
-    code: int
-    message: str
-    data: T | None = None
+from app.constants import DatasetStatus
+from app.models.validation import DataValidationResult
 
 
 # ------------------------------------------------------------------------------
-# Dataset / DatasetVersion 도메인
-#   - Dataset  : 논리적인 데이터셋 (이름/설명)
-#   - DatasetVersion : 실제 파일 스냅샷 + 버전 정보
+# Dataset
 # ------------------------------------------------------------------------------
-
-# ---- Dataset (논리 데이터셋) ---------------------------------------------------
 
 
 class DatasetBase(SQLModel):
@@ -103,7 +87,9 @@ class Dataset(SQLModel, table=True):
     versions: list["DatasetVersion"] = Relationship(back_populates="dataset")
 
 
-# DatasetBaseline (스키마 + 베이스라인 통계)
+# ------------------------------------------------------------------------------
+# DatasetBaseline
+# ------------------------------------------------------------------------------
 
 
 class DatasetBaselineBase(SQLModel):
@@ -138,7 +124,11 @@ class DatasetBaselinePublic(DatasetBaselineBase):
     updated_at: datetime
 
 
-class DatasetBaseLineRequest(BaseModel):
+class DatasetBaseLineRequest(SQLModel):
+    """
+    베이스라인 생성 시 API 요청 바디.
+    """
+
     label_column: str | None = None
 
 
@@ -169,7 +159,9 @@ class DatasetBaseline(DatasetBaselineBase, table=True):
     )
 
 
-# ---- DatasetVersion (실제 버전/스냅샷) ---------------------------------------
+# ------------------------------------------------------------------------------
+# DatasetVersion
+# ------------------------------------------------------------------------------
 
 
 class DatasetVersionBase(SQLModel):
@@ -257,65 +249,11 @@ class DatasetVersion(DatasetVersionBase, table=True):
     dataset: Dataset = Relationship(back_populates="versions")
 
 
-class ModelBase(SQLModel):
-    name: str = Field(max_length=255)
-    task: str = Field(max_length=64)
-    status: ModelStatus = Field(
-        default=ModelStatus.ACTIVE,
-        sa_column=Column(
-            Enum(ModelStatus, name="model_status"),
-            nullable=False,
-            server_default=ModelStatus.ACTIVE,
-        ),
-    )
+# ------------------------------------------------------------------------------
+# Baseline + Validation
+# ------------------------------------------------------------------------------
 
 
-class ModelCreate(ModelBase):
-    pass
-
-
-class ModelPublic(ModelBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-
-class ModelsPubic(SQLModel):
-    results: list[ModelPublic]
-    count: int
-
-
-class Model(ModelBase, table=True):
-    id: int = Field(default=None, primary_key=True, index=True)
-    created_at: datetime = Field(
-        default=None,
-        sa_column=Column(
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
-        ),
-    )
-    updated_at: datetime = Field(
-        default=None,
-        sa_column=Column(
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
-            onupdate=sa.func.now(),
-        ),
-    )
-    deleted_at: Optional[datetime] = None
-
-
-class TrainModelRequest(BaseModel):
-    """
-    모델 학습 요청 바디.
-
-    - dataset_version_id: 어떤 데이터셋 버전으로 학습할지
-    - split: 검증 시 사용할 split 정보 (기본 "train")
-    - label_column: TFDV에서 라벨 분포 확인용 컬럼명
-    """
-
-    dataset_version_id: int
-    split: str
-    label_column: Optional[str] = None 
+class BaselineWithValidationResult(SQLModel):
+    baseline: DatasetBaselinePublic
+    validation: DataValidationResult
