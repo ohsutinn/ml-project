@@ -3,13 +3,11 @@ from fastapi.routing import APIRoute
 
 from app.api.main import api_router
 from app.core.config import settings
-from app.utils import ensure_output_dirs
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
     return f"{route.tags[0]}-{route.name}"
 
-ensure_output_dirs()
 
 app = FastAPI(
     title="ArgMax Mini — TFDV Validation Server",

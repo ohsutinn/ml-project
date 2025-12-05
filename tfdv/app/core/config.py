@@ -18,24 +18,5 @@ class Settings(BaseSettings):
     MINIO_ACCESS_KEY: str
     MINIO_SECRET_KEY: str
 
-    # ---- TFDV / 파일 경로 관련 ----
-    DV_BASE_DIR: Path = Path("/opt/data_validation")
-
-    @property
-    def DV_OUTPUT_DIR(self) -> Path:
-        return self.DV_BASE_DIR / "output"
-
-    @property
-    def DV_SCHEMA_DIR(self) -> Path:
-        return self.DV_OUTPUT_DIR / "schema"
-
-    @property
-    def DV_STATS_DIR(self) -> Path:
-        return self.DV_OUTPUT_DIR / "stats"
-
-    @property
-    def DV_ANOMALIES_DIR(self) -> Path:
-        return self.DV_OUTPUT_DIR / "anomalies"
-
 
 settings = Settings()
