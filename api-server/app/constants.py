@@ -24,3 +24,9 @@ class DVSplit(str, enum.Enum):
     TRAIN = "TRAIN"
     EVAL = "EVAL"
     SERVING = "SERVING"
+
+
+class AnomalySeverity(str, enum.Enum):
+    UNKNOWN = "UNKNOWN"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
