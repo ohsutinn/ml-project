@@ -1,10 +1,13 @@
+from this import d
 from fastapi import APIRouter
 
-from app.api.routes import dataset, model
+from app.api.routes import dataset, dataset_baseline, dataset_version, model
 
 api_router = APIRouter()
 
 api_router.include_router(dataset.router)
+api_router.include_router(dataset_version.router)
+api_router.include_router(dataset_baseline.router)
 api_router.include_router(model.router)
 
 
