@@ -1,4 +1,3 @@
-from this import d
 from fastapi import APIRouter
 
 from app.api.routes import dataset, dataset_baseline, dataset_version, model
