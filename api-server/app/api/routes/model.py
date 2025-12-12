@@ -10,6 +10,7 @@ from app.models.model import (
     Model,
     ModelCreate,
     ModelPublic,
+    PreprocessCompletePayload,
     TrainModelRequest,
     TrainingJob,
 )
@@ -112,5 +113,47 @@ async def train_model(
         data={
             "training_job_id": job.id,
             "workflow_name": workflow_name,
+        },
+    )
+
+
+internal_router = APIRouter(
+    prefix="/internal/train",
+    tags=["internal-train"],
+    include_in_schema=False,
+)
+
+
+@internal_router.post(
+    "/preprocess-complete",
+    response_model=ApiResponse[dict],
+)
+async def preprocess_complete(
+    payload: PreprocessCompletePayload,
+    session: SessionDep,
+) -> Any:
+    """
+    Argo train-client 가 전처리 완료 후 호출하는 콜백.
+    train / eval 경로를 TrainingJob 에 저장.
+    """
+    job = await session.get(TrainingJob, payload.training_job_id)
+    if not job:
+        raise HTTPException(404, "TrainingJob 을 찾을 수 없습니다.")
+
+    job.train_path = payload.train_path
+    job.eval_path = payload.eval_path
+    job.status = TrainingJobStatus.PREPROCESSED
+
+    await session.commit()
+    await session.refresh(job)
+
+    return ApiResponse(
+        code=HTTPStatus.OK,
+        message="전처리 결과 저장 완료",
+        data={
+            "training_job_id": job.id,
+            "train_path": job.train_path,
+            "eval_path": job.eval_path,
+            "status": job.status,
         },
     )

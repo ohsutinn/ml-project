@@ -8,6 +8,7 @@ api_router.include_router(dataset.router)
 api_router.include_router(dataset_version.router)
 api_router.include_router(dataset_baseline.router)
 api_router.include_router(model.router)
+api_router.include_router(model.internal_router)
 
 
 @api_router.get("/health", tags=["health"])
