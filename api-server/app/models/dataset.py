@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import sqlalchemy as sa
 from sqlmodel import Field, Relationship, SQLModel
@@ -254,6 +254,13 @@ class DatasetVersion(DatasetVersionBase, table=True):
 # ------------------------------------------------------------------------------
 
 
-class BaselineWithValidationResult(SQLModel):
-    baseline: DatasetBaselinePublic
-    validation: DataValidationResult
+class BaselineJobCreated(SQLModel):
+    workflow_name: str
+    dataset_id: int
+    dataset_version: int
+    status: DatasetStatus
+
+class BaselineCallback(SQLModel):
+    dataset_id: int
+    dataset_version_id: int
+    dv_result: Dict[str, Any]  
