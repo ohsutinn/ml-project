@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from pydantic import BaseModel
 from sqlmodel import Column, Enum, Field, SQLModel
 
-from app.constants import ModelStatus
+from app.constants import ModelStatus, TrainingJobStatus
 
 
 class ModelBase(SQLModel):
@@ -56,6 +56,46 @@ class Model(ModelBase, table=True):
         ),
     )
     deleted_at: Optional[datetime] = None
+
+
+class TrainingJob(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    model_id: int = Field(index=True)
+    dataset_id: int = Field(index=True)
+    dataset_version_id: int = Field(index=True)
+
+    workflow_name: str = Field(max_length=255)
+
+    train_path: Optional[str] = Field(default=None, max_length=1024)
+    eval_path: Optional[str] = Field(default=None, max_length=1024)
+
+    status: TrainingJobStatus = Field(
+        default=TrainingJobStatus.PENDING,
+        sa_column=Column(
+            Enum(TrainingJobStatus, name="training_job_status"),
+            nullable=False,
+            server_default=TrainingJobStatus.PENDING,
+        ),
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+    )
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+        ),
+    )
 
 
 class TrainModelRequest(BaseModel):
