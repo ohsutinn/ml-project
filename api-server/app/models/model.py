@@ -110,3 +110,9 @@ class TrainModelRequest(BaseModel):
     dataset_version_id: int
     split: str
     label_column: Optional[str] = None
+
+
+class PreprocessCompletePayload(BaseModel):
+    training_job_id: int
+    train_path: str
+    eval_path: str
