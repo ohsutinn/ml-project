@@ -3,10 +3,17 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import SessionDep
-from app.constants import ModelStatus
+from app.constants import ModelStatus, TrainingJobStatus
 from app.models.common import ApiResponse
-from app.models.dataset import DatasetVersion
-from app.models.model import Model, ModelCreate, ModelPublic, TrainModelRequest
+from app.models.dataset import Dataset, DatasetVersion
+from app.models.model import (
+    Model,
+    ModelCreate,
+    ModelPublic,
+    TrainModelRequest,
+    TrainingJob,
+)
+from app.services.argo import create_model_train_workflow
 
 
 router = APIRouter(prefix="/models", tags=["models"])
@@ -45,16 +52,7 @@ async def train_model(
 ) -> Any:
     """
     모델 학습 요청
-
-    1. 모델 존재/상태 확인
-    2. dataset_version_id 로 DatasetVersion 조회
-    3. DatasetVersion.storage_path 를 기반으로 DV 서버에 검증 요청
-    4. 검증 결과(anomalies/summary)를 보고
-       - 문제가 심각하면 400/422 등으로 바로 에러 응답
-       - 통과하면 실제 학습 파이프라인(or 배치잡) 트리거
-
-    ⚠️ 여기서는 "학습 파이프라인 트리거"는 TODO로 남겨두고,
-       DV 검증 → 간단 결과 반환까지만 처리.
+    - TFDV VALIDATE + 전처리 파이프라인(Argo Workflow) 트리거
     """
 
     # 1) 모델 존재 검증
@@ -69,11 +67,50 @@ async def train_model(
             status_code=404, detail="존재하지 않는 데이터셋 버전입니다."
         )
 
-    # TODO: 실제 학습 파이프라인 트리거
+    dataset = await session.get(Dataset, dataset_version.dataset_id)
+    if not dataset or dataset.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="존재하지 않는 데이터셋입니다.")
+
+    # 3) 베이스라인 정보 확인 (없으면 학습 시작하면 안 됨)
+    if not dataset.schema_path or not dataset.baseline_stats_path:
+        raise HTTPException(
+            status_code=400,
+            detail="해당 데이터셋에는 베이스라인이 없습니다. 먼저 베이스라인을 생성하세요.",
+        )
+
+    # 4) Argo Workflow 에 넘길 payload 구성
+    workflow_payload = {
+        "model_id": model.id,
+        "dataset_id": dataset.id,
+        "dataset_version_id": dataset_version.id,
+        "dataset_version": dataset_version.version,
+        "data_path": dataset_version.storage_path,
+        "label_column": train_in.label_column,
+        "split": train_in.split,
+        "schema_path": dataset.schema_path,
+        "baseline_stats_path": dataset.baseline_stats_path,
+    }
+
+    # 5) Argo Workflow 생성
+    workflow_name = create_model_train_workflow(workflow_payload)
+
+    # 6) TrainingJob 레코드 생성
+    job = TrainingJob(
+        model_id=model.id,
+        dataset_id=dataset.id,
+        dataset_version_id=dataset_version.id,
+        workflow_name=workflow_name,
+        status=TrainingJobStatus.RUNNING,
+    )
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
 
     return ApiResponse(
         code=HTTPStatus.ACCEPTED,
-        message="데이터 검증 통과. 학습 파이프라인을 시작할 수 있는 상태입니다.",
+        message="학습 파이프라인(전처리 전까지)을 시작했습니다.",
         data={
+            "training_job_id": job.id,
+            "workflow_name": workflow_name,
         },
     )
