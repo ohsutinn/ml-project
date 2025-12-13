@@ -1,0 +1,14 @@
+dataset_name: taxi_trips
+
+target:
+  name: tips           
+  problem_type: regression  
+
+drop_columns:
+  - pickup_census_tract
+  - dropoff_census_tract
+
+split:
+  test_size: 0.2
+  random_state: 42
+  stratify_by: null 
