@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import SessionDep
-from app.constants import ModelStatus, TrainingJobStatus
+from app.constants import DVMode, ModelStatus, TrainingJobStatus
 from app.models.common import ApiResponse
 from app.models.dataset import Dataset, DatasetVersion
 from app.models.model import (
@@ -72,38 +72,45 @@ async def train_model(
     if not dataset or dataset.deleted_at is not None:
         raise HTTPException(status_code=404, detail="존재하지 않는 데이터셋입니다.")
 
-    # 3) 베이스라인 정보 확인 (없으면 학습 시작하면 안 됨)
+    # 3) 베이스라인 정보 확인
     if not dataset.schema_path or not dataset.baseline_stats_path:
         raise HTTPException(
             status_code=400,
             detail="해당 데이터셋에는 베이스라인이 없습니다. 먼저 베이스라인을 생성하세요.",
         )
 
-    # 4) Argo Workflow 에 넘길 payload 구성
+    # 4) TrainingJob 레코드 먼저 생성 
+    job = TrainingJob(
+        model_id=model.id,
+        dataset_id=dataset.id,
+        dataset_version_id=dataset_version.id,
+        workflow_name="",
+        status=TrainingJobStatus.PENDING,
+    )
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+
+    # 5) Argo Workflow 에 넘길 payload 구성
     workflow_payload = {
+        "training_job_id": job.id, 
         "model_id": model.id,
         "dataset_id": dataset.id,
         "dataset_version_id": dataset_version.id,
         "dataset_version": dataset_version.version,
         "data_path": dataset_version.storage_path,
         "label_column": train_in.label_column,
+        "mode": DVMode.VALIDATE,
         "split": train_in.split,
         "schema_path": dataset.schema_path,
         "baseline_stats_path": dataset.baseline_stats_path,
     }
 
-    # 5) Argo Workflow 생성
+    # 6) Argo Workflow 생성
     workflow_name = create_model_train_workflow(workflow_payload)
 
-    # 6) TrainingJob 레코드 생성
-    job = TrainingJob(
-        model_id=model.id,
-        dataset_id=dataset.id,
-        dataset_version_id=dataset_version.id,
-        workflow_name=workflow_name,
-        status=TrainingJobStatus.RUNNING,
-    )
-    session.add(job)
+    job.workflow_name = workflow_name
+    job.status = TrainingJobStatus.RUNNING
     await session.commit()
     await session.refresh(job)
 
