@@ -65,7 +65,7 @@ class TrainingJob(SQLModel, table=True):
     dataset_id: int = Field(index=True)
     dataset_version_id: int = Field(index=True)
 
-    workflow_name: str = Field(max_length=255)
+    workflow_name: str = Field(default="", max_length=255)
 
     train_path: Optional[str] = Field(default=None, max_length=1024)
     eval_path: Optional[str] = Field(default=None, max_length=1024)
