@@ -1,14 +1,37 @@
-dataset_name: taxi_trips
-
 target:
-  name: tips           
+  name: tips
   problem_type: regression  
-
-drop_columns:
-  - pickup_census_tract
-  - dropoff_census_tract
 
 split:
   test_size: 0.2
   random_state: 42
-  stratify_by: null 
+  stratify_by: null        
+
+drop_columns:
+  - trip_start_timestamp
+  - pickup_census_tract
+  - dropoff_census_tract
+
+hpo:
+  base_hparams:
+    hidden_units: 128
+    dropout: 0.2
+    activation: relu
+    optimizer: adam
+    epochs: 5
+    batch_size: 32
+    learning_rate: 0.001
+
+  sweep_config:
+    method: grid
+    parameters:
+      hidden_units:
+        values: [64, 128, 256]                   
+      activation:
+        values: ['relu', 'sigmoid']         
+      dropout:
+        values: [0.1, 0.2, 0.3, 0.4, 0.5]     
+      optimizer:
+        values: ['adam', 'rmsprop']         
+      learning_rate:
+        values: [0.1, 0.01, 0.001]
