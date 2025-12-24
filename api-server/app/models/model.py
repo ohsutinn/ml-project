@@ -67,8 +67,13 @@ class TrainingJob(SQLModel, table=True):
 
     workflow_name: str = Field(default="", max_length=255)
 
+    # 전처리 결과
     train_path: Optional[str] = Field(default=None, max_length=1024)
     eval_path: Optional[str] = Field(default=None, max_length=1024)
+
+    # HPO + 학습 결과 아티팩트
+    best_hparams_uri: Optional[str] = Field(default=None, max_length=1024)
+    best_model_uri: Optional[str] = Field(default=None, max_length=1024)
 
     status: TrainingJobStatus = Field(
         default=TrainingJobStatus.PENDING,
@@ -97,7 +102,6 @@ class TrainingJob(SQLModel, table=True):
         ),
     )
 
-
 class TrainModelRequest(BaseModel):
     """
     모델 학습 요청 바디.
@@ -110,9 +114,18 @@ class TrainModelRequest(BaseModel):
     dataset_version_id: int
     split: str
     label_column: Optional[str] = None
+    config_name: str 
 
 
 class PreprocessCompletePayload(BaseModel):
     training_job_id: int
     train_path: str
     eval_path: str
+
+
+class TrainCompletePayload(SQLModel):
+    training_job_id: int
+    dataset_id: int
+    dataset_version_id: int
+    best_hparams_uri: str
+    model_uri: str

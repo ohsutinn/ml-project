@@ -11,6 +11,7 @@ from app.models.model import (
     ModelCreate,
     ModelPublic,
     PreprocessCompletePayload,
+    TrainCompletePayload,
     TrainModelRequest,
     TrainingJob,
 )
@@ -79,7 +80,15 @@ async def train_model(
             detail="해당 데이터셋에는 베이스라인이 없습니다. 먼저 베이스라인을 생성하세요.",
         )
 
-    # 4) TrainingJob 레코드 먼저 생성 
+    # 3-1) config 필수 체크
+    if not train_in.config_name:
+        raise HTTPException(
+            status_code=400,
+            detail="config 를 지정해야 합니다.",
+        )
+    config_name = train_in.config_name
+
+    # 4) TrainingJob 레코드 먼저 생성
     job = TrainingJob(
         model_id=model.id,
         dataset_id=dataset.id,
@@ -93,7 +102,7 @@ async def train_model(
 
     # 5) Argo Workflow 에 넘길 payload 구성
     workflow_payload = {
-        "training_job_id": job.id, 
+        "training_job_id": job.id,
         "model_id": model.id,
         "dataset_id": dataset.id,
         "dataset_version_id": dataset_version.id,
@@ -104,6 +113,7 @@ async def train_model(
         "split": train_in.split,
         "schema_path": dataset.schema_path,
         "baseline_stats_path": dataset.baseline_stats_path,
+        "config_name": config_name,
     }
 
     # 6) Argo Workflow 생성
@@ -161,6 +171,34 @@ async def preprocess_complete(
             "training_job_id": job.id,
             "train_path": job.train_path,
             "eval_path": job.eval_path,
+            "status": job.status,
+        },
+    )
+
+
+@internal_router.post(
+    "/train-complete",
+    response_model=ApiResponse[dict],
+)
+async def train_complete(payload: TrainCompletePayload, session: SessionDep) -> Any:
+    job = await session.get(TrainingJob, payload.training_job_id)
+    if not job:
+        raise HTTPException(404, "TrainingJob 을 찾을 수 없습니다.")
+
+    job.best_hparams_uri = payload.best_hparams_uri
+    job.best_model_uri = payload.model_uri
+    job.status = TrainingJobStatus.DONE
+
+    await session.commit()
+    await session.refresh(job)
+
+    return ApiResponse(
+        code=HTTPStatus.OK,
+        message="모델 학습 완료",
+        data={
+            "training_job_id": job.id,
+            "best_hparams_uri": job.best_hparams_uri,
+            "model_uri": job.best_model_uri,
             "status": job.status,
         },
     )
