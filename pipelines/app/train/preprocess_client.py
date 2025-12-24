@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from app.core.preprocess_config import load_preprocess_config
+from app.core.load_config import load_config
 from app.core.storage import resolve_data_path, save_preprocessed_split
 
 
@@ -26,7 +26,7 @@ def run_preprocess(
     4) train / eval split
     5) MinIO에 업로드 후 URI 반환
     """
-    cfg = load_preprocess_config(config_name)
+    cfg = load_config(config_name)
 
     target_cfg = cfg.get("target", {}) or {}
     target = target_cfg.get("name")
@@ -50,6 +50,13 @@ def run_preprocess(
 
     # 3) 결측치 row 제거
     df = df.dropna().reset_index(drop=True)
+
+    cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+    if label_column and label_column in cat_cols:
+        cat_cols.remove(label_column)
+
+    if cat_cols:
+        df = pd.get_dummies(df, columns=cat_cols, dummy_na=False)
 
     # 4) stratify 설정
     stratify = None
@@ -113,8 +120,11 @@ def main():
     dataset_version = payload["dataset_version"]
     data_path = payload["data_path"]
     label_column = payload.get("label_column")
-    preprocess_config = payload.get("preprocess_config", "taxi_trips")
+    config_name = payload.get("config_name")
 
+    if not config_name:
+        raise ValueError("payload.config_name 가 필요합니다.")
+        
     # 1) MinIO → 로컬 CSV 다운로드
     local_data_path = resolve_data_path(data_path)
 
@@ -124,7 +134,7 @@ def main():
         dataset_id=dataset_id,
         dataset_version=dataset_version,
         label_column=label_column,
-        config_name=preprocess_config,
+        config_name=config_name,
     )
 
     # 3) Argo outputs 로 넘길 파일 작성
