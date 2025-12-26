@@ -1,14 +1,14 @@
 import json
 import sys
-
 import httpx
 from app.core.config import settings
 
 
 def main():
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 7:
         print(
-            "Usage: train_complete_client '<payload-json>' '<best-hparams-uri>' '<model-uri>'",
+            "Usage: train_complete_client '<payload-json>' '<best-hparams-uri>' '<model-uri>' "
+            "'<mlflow-model-name>' '<mlflow-model-version>' '<mlflow-run-id>'",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -16,6 +16,9 @@ def main():
     raw_json = sys.argv[1]
     best_hparams_uri = sys.argv[2]
     model_uri = sys.argv[3]
+    mlflow_model_name = sys.argv[4]
+    mlflow_model_version = sys.argv[5]
+    mlflow_run_id = sys.argv[6]
 
     payload = json.loads(raw_json)
     training_job_id = payload["training_job_id"]
@@ -29,18 +32,16 @@ def main():
         "dataset_version_id": payload["dataset_version_id"],
         "best_hparams_uri": best_hparams_uri,
         "model_uri": model_uri,
+        "mlflow_model_name": mlflow_model_name,
+        "mlflow_model_version": mlflow_model_version,
+        "mlflow_run_id": mlflow_run_id,
     }
 
     with httpx.Client(timeout=None) as client:
         resp = client.post(cb_url, json=callback_payload)
         resp.raise_for_status()
 
-    print(
-        json.dumps(
-            {"status": "ok", "training_job_id": training_job_id},
-            ensure_ascii=False,
-        )
-    )
+    print(json.dumps({"status": "ok", "training_job_id": training_job_id}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
