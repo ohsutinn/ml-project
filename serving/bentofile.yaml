@@ -1,0 +1,8 @@
+service: "app.service:svc"
+
+runners:
+  model:
+    batching:
+      enabled: true
+      max_batch_size: 64
+      max_latency_ms: 20
