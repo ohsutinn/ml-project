@@ -68,3 +68,28 @@ def save_preprocessed_split(
     )
 
     return f"{bucket}/{object_name}"
+
+
+def save_preprocess_artifact(
+    local_path: str,
+    *,
+    dataset_id: int,
+    dataset_version: int,
+    file_name: Optional[str] = None,
+) -> str:
+    """
+    전처리 상태(JSON 등)를 MinIO에 업로드하고 URI를 반환한다.
+    """
+    ensure_bucket()
+    bucket = BUCKET_NAME
+
+    file_name = file_name or Path(local_path).name
+    object_name = f"preprocess_state/datasets/{dataset_id}/v{dataset_version}/{file_name}"
+
+    minio_client.fput_object(
+        bucket_name=bucket,
+        object_name=object_name,
+        file_path=local_path,
+    )
+
+    return f"{bucket}/{object_name}"

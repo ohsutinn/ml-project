@@ -41,9 +41,12 @@ def compute_metrics(problem_type: str, y_true: np.ndarray, y_pred: np.ndarray) -
 
 
 def main() -> None:
-    if len(sys.argv) < 6:
+    if len(sys.argv) < 7:
         print(
-            "Usage: register_client '<payload-json>' '<train-path>' '<eval-path>' '<best-hparams-uri>' '<model-uri>'",
+            (
+                "Usage: register_client '<payload-json>' '<train-path>' '<eval-path>' "
+                "'<preprocess-state-uri>' '<best-hparams-uri>' '<model-uri>'"
+            ),
             file=sys.stderr,
         )
         sys.exit(1)
@@ -51,8 +54,9 @@ def main() -> None:
     payload = json.loads(sys.argv[1])
     _train_uri = sys.argv[2]  # 지금은 안 씀(필요해지면 signature/샘플 등에 활용 가능)
     eval_uri = sys.argv[3]
-    best_hparams_uri = sys.argv[4]
-    model_uri = sys.argv[5]
+    preprocess_state_uri = sys.argv[4]
+    best_hparams_uri = sys.argv[5]
+    model_uri = sys.argv[6]
 
     training_job_id = int(payload["training_job_id"])
     model_id = int(payload["model_id"])
@@ -83,6 +87,7 @@ def main() -> None:
     local_eval = resolve_data_path(eval_uri)
     local_hparams = resolve_data_path(best_hparams_uri)
     local_model = resolve_data_path(model_uri)
+    local_preprocess_state = resolve_data_path(preprocess_state_uri)
 
     # config 로드 (problem_type)
     cfg = load_config(config_name)
@@ -116,6 +121,7 @@ def main() -> None:
                 "problem_type": str(problem_type),
                 "best_hparams_uri": str(best_hparams_uri),
                 "best_model_uri": str(model_uri),
+                "preprocess_state_uri": str(preprocess_state_uri),
             }
         )
 
@@ -125,6 +131,11 @@ def main() -> None:
 
         # hparams.json도 artifact로 남김
         mlflow.log_artifact(local_hparams, artifact_path="hpo")
+
+        # 전처리 상태 아티팩트
+        preprocess_artifact_name = Path(local_preprocess_state).name
+        preprocess_artifact_path = f"preprocess/{preprocess_artifact_name}"
+        mlflow.log_artifact(local_preprocess_state, artifact_path="preprocess")
 
         # 모델 아티팩트(Tracking)
         mlflow.keras.log_model(
@@ -139,13 +150,17 @@ def main() -> None:
     # -------------------------
     # (선택) candidate alias만 설정 (승격은 사람)
     # -------------------------
+    client = MlflowClient()
     if os.getenv("MLFLOW_SET_CANDIDATE_ALIAS", "true").lower() in ("1", "true", "yes"):
-        client = MlflowClient()
-        client.set_registered_model_alias(
-            name=registered_model_name,
-            alias="candidate",
-            version=mv.version,
-        )
+        client.set_registered_model_alias(name=registered_model_name, alias="candidate", version=mv.version)
+
+    # 전처리 아티팩트 경로를 모델 버전 태그로 남김 (서빙 시 사용)
+    client.set_model_version_tag(
+        name=registered_model_name,
+        version=mv.version,
+        key="preprocess_artifact_path",
+        value=preprocess_artifact_path,
+    )
 
     # -------------------------
     # Argo outputs
@@ -165,6 +180,7 @@ def main() -> None:
                 "model_version": mv.version,
                 "run_id": run_id,
                 "metrics": metrics,
+                "preprocess_artifact_path": preprocess_artifact_path,
             },
             ensure_ascii=False,
         )

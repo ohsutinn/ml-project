@@ -8,7 +8,9 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from app.core.load_config import load_config
-from app.core.storage import resolve_data_path, save_preprocessed_split
+from app.core.storage import resolve_data_path, save_preprocessed_split, save_preprocess_artifact
+
+PREPROCESS_STATE_FILENAME = "preprocess_state.json"
 
 
 def run_preprocess(
@@ -105,7 +107,33 @@ def run_preprocess(
     os.remove(tmp_train)
     os.remove(tmp_eval)
 
-    return train_uri, eval_uri
+    # 8) 전처리 상태 저장 + 업로드
+    feature_columns = [c for c in df.columns if c != label_column] if label_column else list(df.columns)
+    preprocess_state = {
+        "dataset_id": dataset_id,
+        "dataset_version": dataset_version,
+        "label_column": label_column,
+        "drop_columns": drop_columns,
+        "categorical_columns": cat_cols,
+        "feature_columns": feature_columns,
+        "all_columns": df.columns.tolist(),
+        "config_name": config_name,
+    }
+
+    fd_state, tmp_state = tempfile.mkstemp(suffix=".json")
+    os.close(fd_state)
+    with open(tmp_state, "w", encoding="utf-8") as f:
+        json.dump(preprocess_state, f, ensure_ascii=False, indent=2)
+
+    preprocess_state_uri = save_preprocess_artifact(
+        tmp_state,
+        dataset_id=dataset_id,
+        dataset_version=dataset_version,
+        file_name=PREPROCESS_STATE_FILENAME,
+    )
+    os.remove(tmp_state)
+
+    return train_uri, eval_uri, preprocess_state_uri
 
 
 def main():
@@ -129,7 +157,7 @@ def main():
     local_data_path = resolve_data_path(data_path)
 
     # 2) 전처리 + split + 업로드
-    train_uri, eval_uri = run_preprocess(
+    train_uri, eval_uri, preprocess_state_uri = run_preprocess(
         local_path=local_data_path,
         dataset_id=dataset_id,
         dataset_version=dataset_version,
@@ -144,10 +172,17 @@ def main():
     with open("/tmp/eval_path.txt", "w", encoding="utf-8") as f:
         f.write(eval_uri)
 
+    with open("/tmp/preprocess_state_uri.txt", "w", encoding="utf-8") as f:
+        f.write(preprocess_state_uri)
+
     # 디버깅 출력
     print(
         json.dumps(
-            {"train_path": train_uri, "eval_path": eval_uri},
+            {
+                "train_path": train_uri,
+                "eval_path": eval_uri,
+                "preprocess_state_uri": preprocess_state_uri,
+            },
             ensure_ascii=False,
         )
     )
