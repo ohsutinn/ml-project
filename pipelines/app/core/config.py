@@ -17,5 +17,12 @@ class Settings(BaseSettings):
     MINIO_ACCESS_KEY: str
     MINIO_SECRET_KEY: str
 
+    MLFLOW_MODEL_URI: str
+    BENTO_MODEL_TAG: str
+    BENTO_MODEL_NAME: str
+    BENTO_SIGNATURE_METHOD: str
+
+
+
 
 settings = Settings()
