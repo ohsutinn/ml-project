@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import SessionDep
 from app.constants import DVMode, ModelStatus, TrainingJobStatus
+from app.core.config import settings
 from app.models.common import ApiResponse
 from app.models.dataset import Dataset, DatasetVersion
 from app.models.model import (
@@ -11,11 +12,13 @@ from app.models.model import (
     ModelCreate,
     ModelPublic,
     PreprocessCompletePayload,
+    PromoteModelRequest,
+    PromoteModelResponse,
     TrainCompletePayload,
     TrainModelRequest,
     TrainingJob,
 )
-from app.services.argo import create_model_train_workflow
+from app.services.argo import create_model_deploy_workflow, create_model_train_workflow
 
 
 router = APIRouter(prefix="/models", tags=["models"])
@@ -201,4 +204,41 @@ async def train_complete(payload: TrainCompletePayload, session: SessionDep) -> 
             "model_uri": job.best_model_uri,
             "status": job.status,
         },
+    )
+
+
+@router.post(
+    "/{model_id}/promote",
+    response_model=ApiResponse[PromoteModelResponse],
+)
+async def promote_model(model_id: int, body: PromoteModelRequest, session: SessionDep) -> Any:
+    model = await session.get(Model, model_id)
+    if not model or getattr(model, "deleted_at", None) is not None:
+        raise HTTPException(status_code=404, detail="존재하지 않는 모델입니다.")
+
+    registered_model_name = f"automl_model_{model_id}"
+    deploy_name = "automl-model-"+{model_id}+"-serving"
+
+    wf_name = create_model_deploy_workflow(
+        {
+            "model_id": model_id,
+            "registered_model_name": registered_model_name,
+            "src_alias": body.src_alias,
+            "dst_alias": body.dst_alias,
+            "serving_namespace": body.serving_namespace,
+            "deploy_name": deploy_name,
+            "serving_image": body.serving_image,
+            "bento_signature_method": body.bento_signature_method,
+        }
+    )
+
+    return ApiResponse(
+        code=HTTPStatus.OK,
+        message="모델 승격/배포 워크플로우를 시작했습니다.",
+        data=PromoteModelResponse(
+            workflow_name=wf_name,
+            deploy_name=deploy_name,
+            registered_model_name=registered_model_name,
+            dst_alias=body.dst_alias,
+        ),
     )

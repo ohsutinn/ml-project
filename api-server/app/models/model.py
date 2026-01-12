@@ -129,3 +129,18 @@ class TrainCompletePayload(SQLModel):
     dataset_version_id: int
     best_hparams_uri: str
     model_uri: str
+
+class PromoteModelRequest(BaseModel):
+    src_alias: str = "candidate"
+    dst_alias: str = "production"
+    serving_namespace: str = "automl-serving"
+    deploy_name: str | None = None
+    serving_image: str = "ohsepang/automl-serving:0.1.0"
+    bento_signature_method: str = "predict"
+
+
+class PromoteModelResponse(BaseModel):
+    workflow_name: str
+    deploy_name: str
+    registered_model_name: str
+    dst_alias: str
