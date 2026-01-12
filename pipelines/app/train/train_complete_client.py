@@ -1,7 +1,7 @@
 import json
 import sys
 import httpx
-from app.core.config import settings
+from app.core.config import get_api_settings
 
 
 def main():
@@ -23,7 +23,8 @@ def main():
     payload = json.loads(raw_json)
     training_job_id = payload["training_job_id"]
 
-    api_base_url = settings.API_BASE_URL.rstrip("/")
+    api_settings = get_api_settings()
+    api_base_url = api_settings.API_BASE_URL.rstrip("/")
     cb_url = f"{api_base_url}/api/v1/internal/train/train-complete"
 
     callback_payload = {

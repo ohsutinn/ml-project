@@ -4,7 +4,7 @@ import sys
 
 import httpx
 
-from app.core.config import settings
+from app.core.config import get_data_validation_settings
 
 
 def main():
@@ -15,7 +15,8 @@ def main():
     raw_json = sys.argv[1]
     payload = json.loads(raw_json)
 
-    dv_base_url = settings.DV_SERVER_URL.rstrip("/")
+    dv_settings = get_data_validation_settings()
+    dv_base_url = dv_settings.DV_SERVER_URL.rstrip("/")
     dv_url = f"{dv_base_url}/api/v1/validation/run"
 
     # DV 요청 바디 (필요한 값만 넣기)

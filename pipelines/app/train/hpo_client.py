@@ -11,7 +11,7 @@ import tensorflow as tf
 import wandb
 from wandb.integration.keras import WandbMetricsLogger
 
-from app.core.config import settings
+from app.core.config import get_wandb_settings
 from app.core.load_config import load_config
 from app.core.storage import resolve_data_path, ensure_bucket
 from app.core.minio import BUCKET_NAME, minio_client
@@ -179,8 +179,9 @@ def main() -> None:
         default_metric = {"name": metric_name, "goal": "maximize"}
 
     # W&B 프로젝트/엔티티
-    entity = getattr(settings, "WANDB_ENTITY", None)
-    project = getattr(settings, "WANDB_PROJECT", "automl-hpo")
+    wandb_settings = get_wandb_settings()
+    entity = wandb_settings.WANDB_ENTITY
+    project = wandb_settings.WANDB_PROJECT
 
     # ✅ sweep 생성용 config (계획표)
     final_sweep_config: Dict[str, Any] = {
