@@ -13,7 +13,7 @@ from wandb.integration.keras import WandbMetricsLogger
 
 from app.core.config import get_wandb_settings
 from app.core.load_config import load_config
-from app.core.storage import resolve_data_path, ensure_bucket
+from app.core.storage import resolve_data_path, ensure_bucket, to_minio_uri
 from app.core.minio import BUCKET_NAME, minio_client
 
 
@@ -30,7 +30,7 @@ def upload_hpo_artifact(
     kind: str,
 ) -> str:
     """
-    HPO 관련 아티팩트를 MinIO에 업로드하고 "bucket/object" URI를 리턴.
+    HPO 관련 아티팩트를 MinIO에 업로드하고 "minio://bucket/object" URI를 리턴.
     """
     ensure_bucket()
     bucket = BUCKET_NAME
@@ -47,7 +47,7 @@ def upload_hpo_artifact(
         file_path=local_path,
     )
 
-    return f"{bucket}/{object_name}"
+    return to_minio_uri(bucket, object_name)
 
 
 # -------------------------
