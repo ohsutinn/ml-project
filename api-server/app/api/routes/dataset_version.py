@@ -16,7 +16,12 @@ from app.models.dataset import (
     DatasetVersionPublic,
     DatasetVersionsPublic,
 )
-from app.services.storage import build_dataset_object_name, ensure_bucket, upload_bytes
+from app.services.storage import (
+    build_dataset_object_name,
+    ensure_bucket,
+    to_minio_uri,
+    upload_bytes,
+)
 
 router = APIRouter(prefix="/datasets", tags=["dataset-versions"])
 
@@ -77,7 +82,7 @@ async def create_dataset_version(
         content_type=file.content_type,
     )
 
-    storage_path = f"{BUCKET_NAME}/{object_name}"
+    storage_path = to_minio_uri(BUCKET_NAME, object_name)
 
     dataset_version_in = DatasetVersionCreate(
         file_name=file.filename,
