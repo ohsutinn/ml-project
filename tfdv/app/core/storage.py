@@ -10,11 +10,32 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.core.minio import BUCKET_NAME, minio_client
 
+MINIO_URI_PREFIX = "minio://"
+
+
+def normalize_minio_uri(uri: str) -> tuple[str, str]:
+    if uri.startswith(MINIO_URI_PREFIX):
+        uri = uri[len(MINIO_URI_PREFIX) :]
+
+    parts = uri.split("/", 1)
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"MinIO URI 형식이 올바르지 않습니다: {uri}",
+        )
+
+    return parts[0], parts[1]
+
+
+def to_minio_uri(bucket: str, object_name: str) -> str:
+    return f"{MINIO_URI_PREFIX}{bucket}/{object_name}"
+
 
 async def ensure_bucket(bucket: str = BUCKET_NAME) -> None:
     """
     TFDV 아티팩트를 저장할 버킷이 없으면 생성.
     """
+
     def _ensure():
         if not minio_client.bucket_exists(bucket):
             minio_client.make_bucket(bucket)
@@ -44,15 +65,15 @@ async def upload_bytes(
 
     await run_in_threadpool(_upload)
 
-    return f"{bucket}/{object_name}"
+    return to_minio_uri(bucket, object_name)
 
 
 def build_tfdv_object_name(
     dataset_id: int,
     version: int,
     split: str,
-    kind: str,  
-    ext: str,   
+    kind: str,
+    ext: str,
 ) -> str:
     """
     TFDV 아티팩트용 object_name 규칙.
@@ -65,17 +86,10 @@ def build_tfdv_object_name(
 
 async def download_bytes(uri: str) -> bytes:
     """
-    'bucket/object' 형식의 URI에서 MinIO 객체를 읽어 bytes로 반환.
+    'minio://bucket/object' 또는 'bucket/object' 형식의 URI에서 MinIO 객체를 읽어 bytes로 반환.
     (스키마/통계/아노말리 로딩용)
     """
-    parts = uri.split("/", 1)
-    if len(parts) != 2:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"MinIO URI 형식이 올바르지 않습니다: {uri}",
-        )
-
-    bucket, object_name = parts
+    bucket, object_name = normalize_minio_uri(uri)
 
     def _download() -> bytes:
         resp = minio_client.get_object(bucket, object_name)
@@ -94,14 +108,7 @@ async def resolve_data_path(path: str) -> str:
     TFDV 입력 데이터(data_path)용 경로 해석.
     """
 
-    parts = path.split("/", 1)
-    if len(parts) != 2:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"지원하지 않는 data_path 형식입니다: {path}",
-        )
-
-    bucket, object_name = parts
+    bucket, object_name = normalize_minio_uri(path)
     suffix = Path(object_name).suffix
 
     fd, tmp_path = tempfile.mkstemp(suffix=suffix)
