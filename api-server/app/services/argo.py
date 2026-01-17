@@ -6,7 +6,6 @@ from app.core.k8s import get_custom_objects_api
 
 ARGO_NAMESPACE = "argo"
 ARGO_DV_TEMPLATE_NAME = "dv-initial-baseline"
-ARGO_TRAIN_TEMPLATE_NAME = "model-train"
 
 
 def create_dv_initial_baseline_workflow(payload: dict) -> str:
@@ -55,6 +54,9 @@ def create_dv_initial_baseline_workflow(payload: dict) -> str:
     return workflow_name
 
 
+ARGO_TRAIN_TEMPLATE_NAME = "model-train"
+
+
 def create_model_train_workflow(payload: dict) -> str:
     custom_api = get_custom_objects_api()
 
@@ -101,7 +103,8 @@ def create_model_train_workflow(payload: dict) -> str:
     return workflow_name
 
 
-ARGO_DEPLOY_TEMPLATE_NAME = "model-deploy" 
+ARGO_DEPLOY_TEMPLATE_NAME = "model-deploy"
+
 
 def create_model_deploy_workflow(payload: dict) -> str:
     """
@@ -147,13 +150,22 @@ def create_model_deploy_workflow(payload: dict) -> str:
             "arguments": {
                 "parameters": [
                     {"name": "model_id", "value": str(payload["model_id"])},
-                    {"name": "registered_model_name", "value": str(payload["registered_model_name"])},
+                    {
+                        "name": "registered_model_name",
+                        "value": str(payload["registered_model_name"]),
+                    },
                     {"name": "src_alias", "value": str(payload["src_alias"])},
                     {"name": "dst_alias", "value": str(payload["dst_alias"])},
-                    {"name": "serving_namespace", "value": str(payload["serving_namespace"])},
+                    {
+                        "name": "serving_namespace",
+                        "value": str(payload["serving_namespace"]),
+                    },
                     {"name": "deploy_name", "value": str(payload["deploy_name"])},
                     {"name": "serving_image", "value": str(payload["serving_image"])},
-                    {"name": "bento_signature_method", "value": str(payload["bento_signature_method"])},
+                    {
+                        "name": "bento_signature_method",
+                        "value": str(payload["bento_signature_method"]),
+                    },
                 ]
             },
         },
