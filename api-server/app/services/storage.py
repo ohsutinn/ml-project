@@ -8,6 +8,12 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.core.minio import minio_client, BUCKET_NAME
 
+MINIO_URI_PREFIX = "minio://"
+
+
+def to_minio_uri(bucket: str, object_name: str) -> str:
+    return f"{MINIO_URI_PREFIX}{bucket}/{object_name}"
+
 
 async def ensure_bucket(bucket: str = BUCKET_NAME) -> None:
     """
