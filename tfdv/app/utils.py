@@ -21,7 +21,7 @@ async def save_stats(
 ) -> str:
     """
     통계 proto → bytes 직렬화 → MinIO 업로드.
-    반환: 'bucket/object' URI.
+    반환: 'minio://bucket/object' URI.
     """
     data = stats.SerializeToString()
     object_name = build_tfdv_object_name(
@@ -47,7 +47,7 @@ async def save_schema(
 ) -> str:
     """
     스키마 proto → bytes 직렬화 → MinIO 업로드.
-    반환: 'bucket/object' URI.
+    반환: 'minio://bucket/object' URI.
     """
     data = schema.SerializeToString()
     object_name = build_tfdv_object_name(
@@ -92,7 +92,7 @@ async def save_anomalies(
 
 async def load_schema_if_exists(schema_uri: str | None) -> schema_pb2.Schema | None:
     """
-    MinIO URI('bucket/object')에서 스키마 로드.
+    MinIO URI('minio://bucket/object' 또는 'bucket/object')에서 스키마 로드.
     """
     if not schema_uri:
         return None
@@ -107,7 +107,7 @@ async def load_stats_if_exists(
     stats_uri: str | None,
 ) -> statistics_pb2.DatasetFeatureStatisticsList | None:
     """
-    MinIO URI('bucket/object')에서 통계 로드.
+    MinIO URI('minio://bucket/object' 또는 'bucket/object')에서 통계 로드.
     """
     if not stats_uri:
         return None
