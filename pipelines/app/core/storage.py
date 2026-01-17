@@ -5,6 +5,26 @@ from typing import Optional
 
 from app.core.minio import BUCKET_NAME, minio_client
 
+MINIO_URI_PREFIX = "minio://"
+
+
+def normalize_minio_uri(path: str) -> tuple[str, str]:
+    """
+    Accepts 'minio://bucket/object' or 'bucket/object' and returns (bucket, object).
+    """
+    if path.startswith(MINIO_URI_PREFIX):
+        path = path[len(MINIO_URI_PREFIX) :]
+
+    parts = path.split("/", 1)
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        raise ValueError(f"지원하지 않는 data_path 형식입니다: {path}")
+
+    return parts[0], parts[1]
+
+
+def to_minio_uri(bucket: str, object_name: str) -> str:
+    return f"{MINIO_URI_PREFIX}{bucket}/{object_name}"
+
 
 def ensure_bucket(bucket: Optional[str] = None) -> None:
     """
@@ -18,15 +38,7 @@ def ensure_bucket(bucket: Optional[str] = None) -> None:
 
 
 def resolve_data_path(path: str) -> str:
-    # 1) minio:// 프리픽스 있으면 제거
-    if path.startswith("minio://"):
-        path = path[len("minio://") :]
-
-    parts = path.split("/", 1)
-    if len(parts) != 2:
-        raise ValueError(f"지원하지 않는 data_path 형식입니다: {path}")
-
-    bucket, object_name = parts
+    bucket, object_name = normalize_minio_uri(path)
 
     suffix = Path(object_name).suffix or ".csv"
     fd, tmp_path = tempfile.mkstemp(suffix=suffix)
@@ -67,7 +79,7 @@ def save_preprocessed_split(
         file_path=local_path,
     )
 
-    return f"{bucket}/{object_name}"
+    return to_minio_uri(bucket, object_name)
 
 
 def save_preprocess_artifact(
@@ -92,4 +104,4 @@ def save_preprocess_artifact(
         file_path=local_path,
     )
 
-    return f"{bucket}/{object_name}"
+    return to_minio_uri(bucket, object_name)
