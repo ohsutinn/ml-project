@@ -70,6 +70,8 @@ class TrainingJob(SQLModel, table=True):
     # 전처리 결과
     train_path: Optional[str] = Field(default=None, max_length=1024)
     eval_path: Optional[str] = Field(default=None, max_length=1024)
+    preprocess_state_uri: Optional[str] = Field(default=None, max_length=1024)
+    feature_schema_hash: Optional[str] = Field(default=None, max_length=128)
 
     # HPO + 학습 결과 아티팩트
     best_hparams_uri: Optional[str] = Field(default=None, max_length=1024)
@@ -121,6 +123,8 @@ class PreprocessCompletePayload(BaseModel):
     training_job_id: int
     train_path: str
     eval_path: str
+    preprocess_state_uri: Optional[str] = None
+    feature_schema_hash: Optional[str] = None
 
 
 class TrainCompletePayload(SQLModel):
@@ -129,6 +133,8 @@ class TrainCompletePayload(SQLModel):
     dataset_version_id: int
     best_hparams_uri: str
     model_uri: str
+    preprocess_state_uri: Optional[str] = None
+    feature_schema_hash: Optional[str] = None
 
 class PromoteModelRequest(BaseModel):
     src_alias: str = "candidate"

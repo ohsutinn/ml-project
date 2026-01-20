@@ -162,6 +162,10 @@ async def preprocess_complete(
 
     job.train_path = payload.train_path
     job.eval_path = payload.eval_path
+    if payload.preprocess_state_uri:
+        job.preprocess_state_uri = payload.preprocess_state_uri
+    if payload.feature_schema_hash:
+        job.feature_schema_hash = payload.feature_schema_hash
     job.status = TrainingJobStatus.PREPROCESSED
 
     await session.commit()
@@ -174,6 +178,8 @@ async def preprocess_complete(
             "training_job_id": job.id,
             "train_path": job.train_path,
             "eval_path": job.eval_path,
+            "preprocess_state_uri": job.preprocess_state_uri,
+            "feature_schema_hash": job.feature_schema_hash,
             "status": job.status,
         },
     )
@@ -190,6 +196,10 @@ async def train_complete(payload: TrainCompletePayload, session: SessionDep) -> 
 
     job.best_hparams_uri = payload.best_hparams_uri
     job.best_model_uri = payload.model_uri
+    if payload.preprocess_state_uri:
+        job.preprocess_state_uri = payload.preprocess_state_uri
+    if payload.feature_schema_hash:
+        job.feature_schema_hash = payload.feature_schema_hash
     job.status = TrainingJobStatus.DONE
 
     await session.commit()
@@ -202,6 +212,8 @@ async def train_complete(payload: TrainCompletePayload, session: SessionDep) -> 
             "training_job_id": job.id,
             "best_hparams_uri": job.best_hparams_uri,
             "model_uri": job.best_model_uri,
+            "preprocess_state_uri": job.preprocess_state_uri,
+            "feature_schema_hash": job.feature_schema_hash,
             "status": job.status,
         },
     )
