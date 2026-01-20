@@ -1,15 +1,18 @@
 from http import HTTPStatus
 from typing import Any
 from fastapi import APIRouter, HTTPException, status
+from sqlmodel import select
 
 from app.api.deps import SessionDep
-from app.constants import DVMode, ModelStatus, TrainingJobStatus
+from app.constants import DVMode, ModelStatus, ModelVersionStatus, ServingStatus, TrainingJobStatus
 from app.core.config import settings
 from app.models.common import ApiResponse
 from app.models.dataset import Dataset, DatasetVersion
 from app.models.model import (
     Model,
     ModelCreate,
+    ModelServing,
+    ModelVersion,
     ModelPublic,
     PreprocessCompletePayload,
     PromoteModelRequest,
@@ -202,6 +205,34 @@ async def train_complete(payload: TrainCompletePayload, session: SessionDep) -> 
         job.feature_schema_hash = payload.feature_schema_hash
     job.status = TrainingJobStatus.DONE
 
+    stmt = select(ModelVersion).where(ModelVersion.training_job_id == job.id)
+    result = await session.exec(stmt)
+    model_version = result.first()
+
+    version_payload = {
+        "model_id": job.model_id,
+        "training_job_id": job.id,
+        "dataset_id": payload.dataset_id,
+        "dataset_version_id": payload.dataset_version_id,
+        "registered_model_name": payload.mlflow_model_name,
+        "mlflow_run_id": payload.mlflow_run_id,
+        "mlflow_model_version": payload.mlflow_model_version,
+        "model_uri": payload.model_uri,
+        "best_hparams_uri": payload.best_hparams_uri,
+        "preprocess_state_uri": payload.preprocess_state_uri or job.preprocess_state_uri,
+        "feature_schema_hash": payload.feature_schema_hash or job.feature_schema_hash,
+        "input_schema": payload.input_schema,
+        "output_schema": payload.output_schema,
+        "status": ModelVersionStatus.READY,
+    }
+
+    if model_version:
+        for key, value in version_payload.items():
+            setattr(model_version, key, value)
+    else:
+        model_version = ModelVersion(**version_payload)
+        session.add(model_version)
+
     await session.commit()
     await session.refresh(job)
 
@@ -229,7 +260,7 @@ async def promote_model(model_id: int, body: PromoteModelRequest, session: Sessi
         raise HTTPException(status_code=404, detail="존재하지 않는 모델입니다.")
 
     registered_model_name = f"automl_model_{model_id}"
-    deploy_name = "automl-model-"+{model_id}+"-serving"
+    deploy_name = f"automl-model-{model_id}-serving"
 
     wf_name = create_model_deploy_workflow(
         {
@@ -243,6 +274,22 @@ async def promote_model(model_id: int, body: PromoteModelRequest, session: Sessi
             "bento_signature_method": body.bento_signature_method,
         }
     )
+
+    serving = ModelServing(
+        model_id=model_id,
+        model_version_id=body.model_version_id,
+        registered_model_name=registered_model_name,
+        src_alias=body.src_alias,
+        dst_alias=body.dst_alias,
+        deploy_name=deploy_name,
+        serving_namespace=body.serving_namespace,
+        serving_image=body.serving_image,
+        bento_signature_method=body.bento_signature_method,
+        workflow_name=wf_name,
+        status=ServingStatus.RUNNING,
+    )
+    session.add(serving)
+    await session.commit()
 
     return ApiResponse(
         code=HTTPStatus.OK,

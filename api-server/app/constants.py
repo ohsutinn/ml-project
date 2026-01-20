@@ -23,6 +23,19 @@ class TrainingJobStatus(str, Enum):
     DONE = "DONE"
 
 
+class ModelVersionStatus(str, Enum):
+    READY = "READY"
+    FAILED = "FAILED"
+    DEPRECATED = "DEPRECATED"
+
+
+class ServingStatus(str, Enum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    READY = "READY"
+    FAILED = "FAILED"
+
+
 class DVMode(str, Enum):
     INITIAL_BASELINE = "INITIAL_BASELINE"
     VALIDATE = "VALIDATE"

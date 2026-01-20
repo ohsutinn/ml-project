@@ -1,11 +1,11 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import sqlalchemy as sa
 from pydantic import BaseModel
 from sqlmodel import Column, Enum, Field, SQLModel
 
-from app.constants import ModelStatus, TrainingJobStatus
+from app.constants import ModelStatus, ModelVersionStatus, ServingStatus, TrainingJobStatus
 
 
 class ModelBase(SQLModel):
@@ -104,6 +104,108 @@ class TrainingJob(SQLModel, table=True):
         ),
     )
 
+
+class ModelVersion(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    model_id: int = Field(index=True, foreign_key="model.id")
+    training_job_id: Optional[int] = Field(default=None, index=True)
+    dataset_id: Optional[int] = Field(default=None, index=True)
+    dataset_version_id: Optional[int] = Field(default=None, index=True)
+
+    registered_model_name: Optional[str] = Field(default=None, max_length=255)
+    mlflow_run_id: Optional[str] = Field(default=None, max_length=128)
+    mlflow_model_version: Optional[str] = Field(default=None, max_length=64)
+
+    model_uri: Optional[str] = Field(default=None, max_length=1024)
+    best_hparams_uri: Optional[str] = Field(default=None, max_length=1024)
+    preprocess_state_uri: Optional[str] = Field(default=None, max_length=1024)
+    feature_schema_hash: Optional[str] = Field(default=None, max_length=128)
+
+    input_schema: Optional[Dict[str, Any]] = Field(
+        default=None,
+        sa_column=sa.Column(sa.JSON, nullable=True),
+    )
+    output_schema: Optional[Dict[str, Any]] = Field(
+        default=None,
+        sa_column=sa.Column(sa.JSON, nullable=True),
+    )
+
+    status: ModelVersionStatus = Field(
+        default=ModelVersionStatus.READY,
+        sa_column=Column(
+            Enum(ModelVersionStatus, name="model_version_status"),
+            nullable=False,
+            server_default=ModelVersionStatus.READY,
+        ),
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+    )
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+        ),
+    )
+
+
+class ModelServing(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    model_id: int = Field(index=True, foreign_key="model.id")
+    model_version_id: Optional[int] = Field(
+        default=None,
+        index=True,
+        foreign_key="modelversion.id",
+    )
+
+    registered_model_name: Optional[str] = Field(default=None, max_length=255)
+    src_alias: str = Field(default="candidate", max_length=64)
+    dst_alias: str = Field(default="production", max_length=64)
+    deploy_name: str = Field(max_length=255)
+    serving_namespace: str = Field(max_length=128)
+    serving_image: str = Field(max_length=255)
+    bento_signature_method: str = Field(max_length=64)
+    workflow_name: str = Field(default="", max_length=255)
+    endpoint_url: Optional[str] = Field(default=None, max_length=1024)
+
+    status: ServingStatus = Field(
+        default=ServingStatus.PENDING,
+        sa_column=Column(
+            Enum(ServingStatus, name="serving_status"),
+            nullable=False,
+            server_default=ServingStatus.PENDING,
+        ),
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+    )
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+        ),
+    )
+
 class TrainModelRequest(BaseModel):
     """
     모델 학습 요청 바디.
@@ -133,12 +235,18 @@ class TrainCompletePayload(SQLModel):
     dataset_version_id: int
     best_hparams_uri: str
     model_uri: str
+    mlflow_model_name: Optional[str] = None
+    mlflow_model_version: Optional[str] = None
+    mlflow_run_id: Optional[str] = None
     preprocess_state_uri: Optional[str] = None
     feature_schema_hash: Optional[str] = None
+    input_schema: Optional[Dict[str, Any]] = None
+    output_schema: Optional[Dict[str, Any]] = None
 
 class PromoteModelRequest(BaseModel):
     src_alias: str = "candidate"
     dst_alias: str = "production"
+    model_version_id: int | None = None
     serving_namespace: str = "automl-serving"
     deploy_name: str | None = None
     serving_image: str = "ohsepang/automl-serving:0.1.0"

@@ -6,19 +6,48 @@ from app.core.config import get_api_settings
 from app.core.storage import resolve_data_path
 
 
-def _load_feature_schema_hash(preprocess_state_uri: str) -> str:
+def _load_preprocess_state(preprocess_state_uri: str) -> dict:
     local_path = resolve_data_path(preprocess_state_uri)
     try:
         with open(local_path, "r", encoding="utf-8") as f:
-            state = json.load(f)
+            return json.load(f)
     finally:
         if os.path.exists(local_path):
             os.remove(local_path)
 
-    feature_schema_hash = state.get("feature_schema_hash")
-    if not feature_schema_hash:
-        raise ValueError("preprocess_state에 feature_schema_hash가 필요합니다.")
-    return str(feature_schema_hash)
+
+def _build_input_schema(state: dict) -> dict:
+    return {
+        "schema_version": state.get("schema_version"),
+        "feature_schema_hash": state.get("feature_schema_hash"),
+        "label_column": state.get("label_column"),
+        "drop_columns": state.get("drop_columns", []),
+        "categorical_columns": state.get("categorical_columns", []),
+        "feature_columns": state.get("feature_columns", []),
+        "config_name": state.get("config_name"),
+        "problem_type": state.get("problem_type"),
+    }
+
+
+def _build_output_schema(state: dict) -> dict:
+    problem_type = state.get("problem_type")
+    if problem_type == "regression":
+        return {"problem_type": problem_type, "type": "number", "shape": [1]}
+    if problem_type == "binary":
+        return {
+            "problem_type": problem_type,
+            "type": "number",
+            "shape": [1],
+            "encoding": "probability",
+        }
+    if problem_type in ("multiclass", "classification"):
+        return {
+            "problem_type": problem_type,
+            "type": "array",
+            "shape": ["num_classes"],
+            "encoding": "probabilities",
+        }
+    return {"problem_type": problem_type}
 
 
 def main():
@@ -46,7 +75,12 @@ def main():
     api_base_url = api_settings.API_BASE_URL.rstrip("/")
     cb_url = f"{api_base_url}/api/v1/internal/train/train-complete"
 
-    feature_schema_hash = _load_feature_schema_hash(preprocess_state_uri)
+    preprocess_state = _load_preprocess_state(preprocess_state_uri)
+    feature_schema_hash = preprocess_state.get("feature_schema_hash")
+    if not feature_schema_hash:
+        raise ValueError("preprocess_state에 feature_schema_hash가 필요합니다.")
+    input_schema = _build_input_schema(preprocess_state)
+    output_schema = _build_output_schema(preprocess_state)
 
     callback_payload = {
         "training_job_id": training_job_id,
@@ -59,6 +93,8 @@ def main():
         "mlflow_run_id": mlflow_run_id,
         "preprocess_state_uri": preprocess_state_uri,
         "feature_schema_hash": feature_schema_hash,
+        "input_schema": input_schema,
+        "output_schema": output_schema,
     }
 
     with httpx.Client(timeout=None) as client:
