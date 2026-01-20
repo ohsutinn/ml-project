@@ -1,3 +1,5 @@
+import hashlib
+import json
 import os
 from pathlib import Path
 import bentoml
@@ -7,8 +9,11 @@ from mlflow.tracking import MlflowClient
 
 from app.preprocessor import Preprocessor
 
-PREPROCESS_TAG_KEY = "preprocess_artifact_path"
-DEFAULT_PREPROCESS_ARTIFACT = "preprocess/preprocess_state.json"
+PREPROCESS_URI_TAG_KEY = "preprocess_state_uri"
+PREPROCESS_HASH_TAG_KEY = "feature_schema_hash"
+PREPROCESS_SCHEMA_VERSION_TAG_KEY = "preprocess_schema_version"
+
+DEFAULT_SCHEMA_VERSION = 1
 
 
 def _parse_model_uri(model_uri: str) -> tuple[str | None, str | None]:
@@ -27,6 +32,25 @@ def _parse_model_uri(model_uri: str) -> tuple[str | None, str | None]:
         name, version = name_alias.split("/", 1)
         return name, version
     return None, None
+
+
+def _compute_feature_schema_hash(state: dict) -> str:
+    schema_payload = {
+        "schema_version": state.get("schema_version", DEFAULT_SCHEMA_VERSION),
+        "label_column": state.get("label_column"),
+        "drop_columns": state.get("drop_columns", []),
+        "categorical_columns": state.get("categorical_columns", []),
+        "feature_columns": state.get("feature_columns", []),
+        "config_name": state.get("config_name"),
+        "problem_type": state.get("problem_type"),
+    }
+    canonical = json.dumps(
+        schema_payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def main():
@@ -51,30 +75,76 @@ def main():
     # 전처리 아티팩트 다운로드 + Bento 모델 저장
     # -------------------------
     preprocess_local_path: str | None = None
+    preprocess_state: dict | None = None
     try:
+        preprocess_state_uri = None
+        expected_hash = None
+        expected_schema_version = None
+
         if model_uri.startswith("models:/"):
             name, alias_or_version = _parse_model_uri(model_uri)
             if name and alias_or_version:
                 if alias_or_version.isdigit():
                     mv = client.get_model_version(name=name, version=alias_or_version)
                 else:
-                    mv = client.get_model_version_by_alias(name=name, alias=alias_or_version)
+                    mv = client.get_model_version_by_alias(
+                        name=name, alias=alias_or_version
+                    )
 
-                artifact_relpath = mv.tags.get(PREPROCESS_TAG_KEY, DEFAULT_PREPROCESS_ARTIFACT)
-                preprocess_local_path = download_artifacts(
-                    artifact_uri=f"runs:/{mv.run_id}/{artifact_relpath}"
+                preprocess_state_uri = mv.tags.get(PREPROCESS_URI_TAG_KEY)
+                expected_hash = mv.tags.get(PREPROCESS_HASH_TAG_KEY)
+                expected_schema_version = mv.tags.get(PREPROCESS_SCHEMA_VERSION_TAG_KEY)
+            else:
+                raise RuntimeError(
+                    "MLFLOW_MODEL_URI 에서 모델 이름/버전을 찾을 수 없습니다."
                 )
         elif model_uri.startswith("runs:/"):
             parts = model_uri.split("/")
             run_id = parts[1] if len(parts) > 1 else None
             if run_id:
-                preprocess_local_path = download_artifacts(
-                    artifact_uri=f"runs:/{run_id}/{DEFAULT_PREPROCESS_ARTIFACT}"
+                run = client.get_run(run_id)
+                preprocess_state_uri = run.data.tags.get(PREPROCESS_URI_TAG_KEY)
+                expected_hash = run.data.tags.get(PREPROCESS_HASH_TAG_KEY)
+                expected_schema_version = run.data.tags.get(
+                    PREPROCESS_SCHEMA_VERSION_TAG_KEY
                 )
-    except Exception as exc:  # pragma: no cover - 보호 로그
-        print(f"[warn] failed to download preprocess artifact: {exc}")
+            else:
+                raise RuntimeError("MLFLOW_MODEL_URI 에서 run_id 를 찾을 수 없습니다.")
+        else:
+            raise RuntimeError(
+                f"지원하지 않는 MLFLOW_MODEL_URI 형식입니다: {model_uri}"
+            )
 
-    if preprocess_local_path and Path(preprocess_local_path).exists():
+        if not preprocess_state_uri:
+            raise RuntimeError("MLflow tag preprocess_state_uri 가 필요합니다.")
+        if not expected_hash:
+            raise RuntimeError("MLflow tag feature_schema_hash 가 필요합니다.")
+        if not expected_schema_version:
+            raise RuntimeError("MLflow tag preprocess_schema_version 가 필요합니다.")
+
+        preprocess_local_path = download_artifacts(artifact_uri=preprocess_state_uri)
+        with open(preprocess_local_path, "r", encoding="utf-8") as f:
+            preprocess_state = json.load(f)
+
+        actual_schema_version = preprocess_state.get("schema_version")
+        if str(actual_schema_version) != str(expected_schema_version):
+            raise RuntimeError(
+                "preprocess_state schema_version 이 MLflow tag 와 일치하지 않습니다."
+            )
+
+        actual_hash = _compute_feature_schema_hash(preprocess_state)
+        if actual_hash != expected_hash:
+            raise RuntimeError(
+                "preprocess_state hash 가 MLflow tag 와 일치하지 않습니다."
+            )
+    except Exception as exc:  # pragma: no cover - 보호 로그
+        print(f"[error] failed to load preprocess state: {exc}")
+
+    if (
+        preprocess_local_path
+        and preprocess_state
+        and Path(preprocess_local_path).exists()
+    ):
         preprocessor = Preprocessor.from_state_file(preprocess_local_path)
         preprocess_model_name = f"{bento_name}_preprocess"
         bento_preprocess_model = bentoml.picklable_model.save_model(
@@ -84,7 +154,8 @@ def main():
         )
         print("Imported Bento preprocess model:", bento_preprocess_model)
     else:
-        print("[warn] preprocess artifact not found; preprocessing will be skipped.")
+        print("[error] preprocess state is required but missing; aborting.")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

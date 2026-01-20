@@ -104,11 +104,26 @@ def main() -> None:
     with open(local_hparams, "r", encoding="utf-8") as f:
         best_hparams: Dict[str, Any] = json.load(f)
 
+    # preprocess 상태 로드
+    with open(local_preprocess_state, "r", encoding="utf-8") as f:
+        preprocess_state: Dict[str, Any] = json.load(f)
+
+    preprocess_schema_version = preprocess_state.get("schema_version")
+    feature_schema_hash = preprocess_state.get("feature_schema_hash")
+    if preprocess_schema_version is None or not feature_schema_hash:
+        raise ValueError("preprocess_state에 schema_version/feature_schema_hash가 필요합니다.")
+
     # -------------------------
     # Tracking(run) + 모델 로깅 + Registry(버전 생성)
     # -------------------------
     with mlflow.start_run(run_name=f"train_job_{training_job_id}") as run:
         run_id = run.info.run_id
+
+        # 전처리 상태 아티팩트
+        preprocess_artifact_name = Path(local_preprocess_state).name
+        preprocess_artifact_path = f"preprocess/{preprocess_artifact_name}"
+        mlflow.log_artifact(local_preprocess_state, artifact_path="preprocess")
+        preprocess_state_uri = f"runs:/{run_id}/{preprocess_artifact_path}"
 
         # UI에서 찾기 쉬운 tags
         mlflow.set_tags(
@@ -122,6 +137,8 @@ def main() -> None:
                 "best_hparams_uri": str(best_hparams_uri),
                 "best_model_uri": str(model_uri),
                 "preprocess_state_uri": str(preprocess_state_uri),
+                "preprocess_schema_version": str(preprocess_schema_version),
+                "feature_schema_hash": str(feature_schema_hash),
             }
         )
 
@@ -131,11 +148,6 @@ def main() -> None:
 
         # hparams.json도 artifact로 남김
         mlflow.log_artifact(local_hparams, artifact_path="hpo")
-
-        # 전처리 상태 아티팩트
-        preprocess_artifact_name = Path(local_preprocess_state).name
-        preprocess_artifact_path = f"preprocess/{preprocess_artifact_name}"
-        mlflow.log_artifact(local_preprocess_state, artifact_path="preprocess")
 
         # 모델 아티팩트(Tracking)
         mlflow.keras.log_model(
@@ -154,12 +166,30 @@ def main() -> None:
     if os.getenv("MLFLOW_SET_CANDIDATE_ALIAS", "true").lower() in ("1", "true", "yes"):
         client.set_registered_model_alias(name=registered_model_name, alias="candidate", version=mv.version)
 
-    # 전처리 아티팩트 경로를 모델 버전 태그로 남김 (서빙 시 사용)
+    # 전처리 아티팩트 경로/해시를 모델 버전 태그로 남김 (서빙 시 사용)
     client.set_model_version_tag(
         name=registered_model_name,
         version=mv.version,
         key="preprocess_artifact_path",
         value=preprocess_artifact_path,
+    )
+    client.set_model_version_tag(
+        name=registered_model_name,
+        version=mv.version,
+        key="preprocess_state_uri",
+        value=preprocess_state_uri,
+    )
+    client.set_model_version_tag(
+        name=registered_model_name,
+        version=mv.version,
+        key="preprocess_schema_version",
+        value=str(preprocess_schema_version),
+    )
+    client.set_model_version_tag(
+        name=registered_model_name,
+        version=mv.version,
+        key="feature_schema_hash",
+        value=str(feature_schema_hash),
     )
 
     # -------------------------
@@ -181,6 +211,9 @@ def main() -> None:
                 "run_id": run_id,
                 "metrics": metrics,
                 "preprocess_artifact_path": preprocess_artifact_path,
+                "preprocess_state_uri": preprocess_state_uri,
+                "preprocess_schema_version": preprocess_schema_version,
+                "feature_schema_hash": feature_schema_hash,
             },
             ensure_ascii=False,
         )

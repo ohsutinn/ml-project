@@ -28,6 +28,19 @@ class Preprocessor:
 
     @classmethod
     def from_state_dict(cls, state: dict) -> "Preprocessor":
+        schema_version = state.get("schema_version")
+        if schema_version is None:
+            raise ValueError("preprocess_state에 schema_version이 필요합니다.")
+
+        required_fields = [
+            "feature_columns",
+            "categorical_columns",
+            "drop_columns",
+        ]
+        for field in required_fields:
+            if field not in state:
+                raise ValueError(f"preprocess_state에 {field} 필드가 필요합니다.")
+
         return cls(
             feature_columns=list(state.get("feature_columns", [])),
             label_column=state.get("label_column"),
