@@ -109,7 +109,7 @@ async def train_model(
         "model_id": model.id,
         "dataset_id": dataset.id,
         "dataset_version_id": dataset_version.id,
-        "dataset_version": dataset_version.version,
+        "dataset_version_number": dataset_version.version,
         "data_path": dataset_version.storage_path,
         "label_column": train_in.label_column,
         "mode": DVMode.VALIDATE,

@@ -25,7 +25,7 @@ def upload_hpo_artifact(
     *,
     model_id: int,
     dataset_id: int,
-    dataset_version: int,
+    dataset_version_number: int,
     training_job_id: int,
     kind: str,
 ) -> str:
@@ -38,7 +38,7 @@ def upload_hpo_artifact(
     file_name = Path(local_path).name
     object_name = (
         f"hpo/model_{model_id}/job_{training_job_id}/"
-        f"dataset_{dataset_id}/v{dataset_version}/{kind}/{file_name}"
+        f"dataset_{dataset_id}/v{dataset_version_number}/{kind}/{file_name}"
     )
 
     minio_client.fput_object(
@@ -143,7 +143,7 @@ def main() -> None:
 
     model_id = int(payload["model_id"])
     dataset_id = int(payload["dataset_id"])
-    dataset_version = int(payload["dataset_version"])
+    dataset_version_number = int(payload["dataset_version_number"])
     training_job_id = int(payload["training_job_id"])
     label_column = str(payload["label_column"])
 
@@ -296,7 +296,7 @@ def main() -> None:
         tmp_hparams,
         model_id=model_id,
         dataset_id=dataset_id,
-        dataset_version=dataset_version,
+        dataset_version=dataset_version_number,
         training_job_id=training_job_id,
         kind="hparams",
     )
@@ -304,7 +304,7 @@ def main() -> None:
         tmp_model,
         model_id=model_id,
         dataset_id=dataset_id,
-        dataset_version=dataset_version,
+        dataset_version=dataset_version_number,
         training_job_id=training_job_id,
         kind="model",
     )

@@ -93,7 +93,9 @@ def main() -> None:
     model_id = int(payload["model_id"])
     dataset_id = int(payload["dataset_id"])
     dataset_version_id = payload.get("dataset_version_id")
-    dataset_version_number = payload.get("dataset_version")
+    dataset_version_number = payload.get("dataset_version_number")
+    if dataset_version_number is None:
+        raise KeyError("payload.dataset_version_number 가 필요합니다.")
     label_column = payload.get("label_column")
     if label_column is None or str(label_column).strip() == "":
         raise ValueError("payload.label_column 가 필요합니다.")

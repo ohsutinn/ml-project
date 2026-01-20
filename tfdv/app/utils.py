@@ -17,7 +17,7 @@ async def save_stats(
     stats: statistics_pb2.DatasetFeatureStatisticsList,
     split: DVSplit,
     dataset_id: int,
-    dataset_version: int,
+    dataset_version_number: int,
 ) -> str:
     """
     통계 proto → bytes 직렬화 → MinIO 업로드.
@@ -26,7 +26,7 @@ async def save_stats(
     data = stats.SerializeToString()
     object_name = build_tfdv_object_name(
         dataset_id=dataset_id,
-        version=dataset_version,
+        version=dataset_version_number,
         split=split.value,
         kind="stats",
         ext="binpb",
@@ -43,7 +43,7 @@ async def save_schema(
     schema: schema_pb2.Schema,
     split: DVSplit,
     dataset_id: int,
-    dataset_version: int,
+    dataset_version_number: int,
 ) -> str:
     """
     스키마 proto → bytes 직렬화 → MinIO 업로드.
@@ -52,7 +52,7 @@ async def save_schema(
     data = schema.SerializeToString()
     object_name = build_tfdv_object_name(
         dataset_id=dataset_id,
-        version=dataset_version,
+        version=dataset_version_number,
         split=split.value,
         kind="schema",
         ext="binpb",
@@ -69,7 +69,7 @@ async def save_anomalies(
     anomalies: anomalies_pb2.Anomalies,
     split: DVSplit,
     dataset_id: int,
-    dataset_version: int,
+    dataset_version_number: int,
 ) -> str:
     """
     아노말리 proto → bytes 직렬화 → MinIO 업로드.
@@ -77,7 +77,7 @@ async def save_anomalies(
     data = anomalies.SerializeToString()
     object_name = build_tfdv_object_name(
         dataset_id=dataset_id,
-        version=dataset_version,
+        version=dataset_version_number,
         split=split.value,
         kind="anomalies",
         ext="binpb",

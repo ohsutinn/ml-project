@@ -51,9 +51,9 @@ class DataValidationRequest(BaseModel):
         description="논리 Dataset ID",
     )
 
-    dataset_version: int = Field(
+    dataset_version_number: int = Field(
         ...,
-        description="DatasetVersion ID.",
+        description="DatasetVersion number.",
     )
 
 
@@ -116,9 +116,9 @@ class DataValidationResult(BaseModel):
         description="해당 검증이 속한 Dataset ID",
     )
 
-    dataset_version: Optional[int] = Field(
+    dataset_version_number: Optional[int] = Field(
         default=None,
-        description="해당 검증이 속한 DatasetVersion",
+        description="해당 검증이 속한 DatasetVersion number",
     )
 
     split: DVSplit

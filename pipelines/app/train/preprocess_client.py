@@ -209,7 +209,7 @@ def main():
 
     dataset_id = payload["dataset_id"]
     dataset_version_id = payload["dataset_version_id"]
-    dataset_version_number = payload["dataset_version"]
+    dataset_version_number = payload["dataset_version_number"]
     data_path = payload["data_path"]
     label_column = payload.get("label_column")
     config_name = payload.get("config_name")

@@ -50,7 +50,7 @@ async def create_baseline(
         "label_column": body.label_column,
         "mode": DVMode.INITIAL_BASELINE.value,
         "dataset_id": dataset_version.dataset_id,
-        "dataset_version": dataset_version.version,
+        "dataset_version_number": dataset_version.version,
         # 콜백용
         "dataset_version_id": dataset_version.id,
     }
@@ -69,7 +69,7 @@ async def create_baseline(
         data=BaselineJobCreated(
             workflow_name=workflow_name,
             dataset_id=dataset_id,
-            dataset_version=dataset_version.version,
+            dataset_version_number=dataset_version.version,
             status=dataset_version.status,
         ),
     )
@@ -123,7 +123,7 @@ async def baseline_complete(
         message="초기 베이스라인 생성 완료",
         data={
             "dataset_id": dataset.id,
-            "dataset_version": dataset_version.version,
+            "dataset_version_number": dataset_version.version,
             "baseline_id": baseline.id,
             "schema_path": baseline.schema_path,
             "baseline_stats_path": baseline.baseline_stats_path,

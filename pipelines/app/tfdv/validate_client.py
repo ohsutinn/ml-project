@@ -19,14 +19,13 @@ def main():
     dv_base_url = dv_settings.DV_SERVER_URL.rstrip("/")
     dv_url = f"{dv_base_url}/api/v1/validation/run"
 
-    # DV 요청 바디 (필요한 값만 넣기)
     dv_request = {
         "data_path": payload["data_path"],
         "split": payload["split"],
         "label_column": payload.get("label_column"),
         "mode": payload["mode"],
         "dataset_id": payload["dataset_id"],
-        "dataset_version": payload["dataset_version"],
+        "dataset_version_number": payload["dataset_version_number"],
         "schema_path": payload.get("schema_path"),
         "baseline_stats_path": payload.get("baseline_stats_path"),
     }

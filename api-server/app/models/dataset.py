@@ -257,7 +257,7 @@ class DatasetVersion(DatasetVersionBase, table=True):
 class BaselineJobCreated(SQLModel):
     workflow_name: str
     dataset_id: int
-    dataset_version: int
+    dataset_version_number: int
     status: DatasetStatus
 
 class BaselineCallback(SQLModel):

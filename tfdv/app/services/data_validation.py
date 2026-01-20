@@ -23,7 +23,7 @@ async def run_data_validation(payload: DataValidationRequest) -> DataValidationR
     mode = payload.mode
 
     dataset_id = payload.dataset_id
-    dataset_version = payload.dataset_version
+    dataset_version_number = payload.dataset_version_number
 
     if mode == DVMode.INITIAL_BASELINE:
         # ── 최초 베이스라인 생성 ─────────────────
@@ -38,14 +38,14 @@ async def run_data_validation(payload: DataValidationRequest) -> DataValidationR
             current_stats,
             split,
             dataset_id=dataset_id,
-            dataset_version=dataset_version,
+            dataset_version_number=dataset_version_number,
         )
 
         schema_uri = await save_schema(
             schema,
             split,
             dataset_id=dataset_id,
-            dataset_version=dataset_version,
+            dataset_version_number=dataset_version_number,
         )
 
         anomaly_list, summary, category_counts = parse_anomalies(anomalies)
@@ -53,7 +53,7 @@ async def run_data_validation(payload: DataValidationRequest) -> DataValidationR
 
         return DataValidationResult(
             dataset_id=dataset_id,
-            dataset_version=dataset_version,
+            dataset_version_number=dataset_version_number,
             split=payload.split,
             data_path=data_path,
             schema_path=schema_uri,
@@ -81,7 +81,7 @@ async def run_data_validation(payload: DataValidationRequest) -> DataValidationR
 
     return DataValidationResult(
         dataset_id=dataset_id,
-        dataset_version=dataset_version,
+        dataset_version_number=dataset_version_number,
         split=payload.split,
         data_path=data_path,
         schema_path=payload.schema_path,
