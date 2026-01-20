@@ -41,11 +41,23 @@ class Preprocessor:
             if field not in state:
                 raise ValueError(f"preprocess_state에 {field} 필드가 필요합니다.")
 
+        feature_columns = list(state.get("feature_columns", []))
+        categorical_columns = list(state.get("categorical_columns", []))
+        drop_columns = list(state.get("drop_columns", []))
+        label_column = state.get("label_column")
+
+        if label_column and label_column in feature_columns:
+            raise ValueError("preprocess_state의 feature_columns에 label_column이 포함되어 있습니다.")
+        if len(feature_columns) != len(set(feature_columns)):
+            raise ValueError("preprocess_state의 feature_columns에 중복 컬럼이 있습니다.")
+        if len(categorical_columns) != len(set(categorical_columns)):
+            raise ValueError("preprocess_state의 categorical_columns에 중복 컬럼이 있습니다.")
+
         return cls(
-            feature_columns=list(state.get("feature_columns", [])),
-            label_column=state.get("label_column"),
-            drop_columns=list(state.get("drop_columns", [])),
-            categorical_columns=list(state.get("categorical_columns", [])),
+            feature_columns=feature_columns,
+            label_column=label_column,
+            drop_columns=drop_columns,
+            categorical_columns=categorical_columns,
         )
 
     def transform(self, data: pd.DataFrame) -> np.ndarray:
