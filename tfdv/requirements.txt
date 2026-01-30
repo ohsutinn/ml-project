@@ -4,6 +4,7 @@ pydantic==2.12.3
 pydantic-settings==2.11.0
 minio==7.2.18
 httpx==0.28.1
-tensorflow-data-validation
+tensorflow-data-validation==1.17.0
 orjson==3.11.4
 dill==0.4.0
+apache-beam==2.69.0
