@@ -36,6 +36,10 @@ def main():
         body = dv_resp.json()
         dv_result = body["data"]
 
+    # 콜백 스텝에서 사용할 DV 결과 저장
+    with open("/tmp/dv_result.json", "w", encoding="utf-8") as f:
+        json.dump(dv_result, f, ensure_ascii=False)
+
     summary = dv_result.get("summary", {})
     block_pipeline = bool(summary.get("block_pipeline"))
 
