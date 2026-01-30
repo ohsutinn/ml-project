@@ -111,7 +111,7 @@ async def baseline_complete(
     if not dataset or dataset.deleted_at is not None:
         raise HTTPException(400, "데이터셋을 찾을 수 없습니다.")
 
-    dataset.baseline_version_id = dataset_version.version
+    dataset.baseline_version_id = dataset_version.id
     dataset.schema_path = baseline.schema_path
     dataset.baseline_stats_path = baseline.baseline_stats_path
 
