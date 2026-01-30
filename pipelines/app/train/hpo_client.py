@@ -296,7 +296,7 @@ def main() -> None:
         tmp_hparams,
         model_id=model_id,
         dataset_id=dataset_id,
-        dataset_version=dataset_version_number,
+        dataset_version_number=dataset_version_number,
         training_job_id=training_job_id,
         kind="hparams",
     )
@@ -304,7 +304,7 @@ def main() -> None:
         tmp_model,
         model_id=model_id,
         dataset_id=dataset_id,
-        dataset_version=dataset_version_number,
+        dataset_version_number=dataset_version_number,
         training_job_id=training_job_id,
         kind="model",
     )
